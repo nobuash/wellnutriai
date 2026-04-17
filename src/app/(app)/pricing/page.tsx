@@ -30,7 +30,7 @@ export default function PricingPage() {
   const supabase = createClient();
   const qc = useQueryClient();
   const [pixData, setPixData] = useState<PixData | null>(null);
-  const [selectedInterval, setSelectedInterval] = useState<PlanInterval>('monthly');
+  const [selectedInterval, setSelectedInterval] = useState<PlanInterval>('annual');
 
   const plan = PLANS[selectedInterval];
 
@@ -159,7 +159,12 @@ export default function PricingPage() {
                   }`}
                 >
                   {INTERVAL_LABELS[interval]}
-                  {PLANS[interval].discountPercent > 0 && (
+                  {interval === 'annual' && (
+                    <span className="absolute -top-2.5 left-1/2 -translate-x-1/2 px-1.5 py-0 rounded text-[9px] font-bold bg-brand-600 text-white leading-4 whitespace-nowrap">
+                      Recomendado
+                    </span>
+                  )}
+                  {interval !== 'annual' && PLANS[interval].discountPercent > 0 && (
                     <span className="absolute -top-2 -right-1 px-1 py-0 rounded text-[9px] font-bold bg-green-500 text-white leading-4">
                       -{PLANS[interval].discountPercent}%
                     </span>
