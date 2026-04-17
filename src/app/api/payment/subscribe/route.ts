@@ -26,27 +26,6 @@ export async function POST(req: Request) {
     .eq('id', user.id)
     .single();
 
-  // Verifica se já existe assinatura pendente para este intervalo
-  const { data: existingSub } = await supabase
-    .from('subscriptions')
-    .select('mp_subscription_id, mp_status')
-    .eq('user_id', user.id)
-    .in('mp_status', ['pending', 'authorized'])
-    .order('created_at', { ascending: false })
-    .limit(1)
-    .maybeSingle();
-
-  if (existingSub?.mp_subscription_id) {
-    try {
-      const existing = await getPreApproval().get({ id: existingSub.mp_subscription_id });
-      if (existing?.init_point) {
-        return NextResponse.json({ init_point: existing.init_point });
-      }
-    } catch {
-      // Se não encontrar, cria uma nova abaixo
-    }
-  }
-
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000';
 
   try {
