@@ -7,7 +7,7 @@ import { createClient } from '@/lib/supabase/client';
 import { formatDate } from '@/lib/utils';
 import type { MealPlan, MealPlanContent } from '@/types/database';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Sparkles } from 'lucide-react';
+import { Droplets, Sparkles } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
@@ -96,12 +96,25 @@ export default function MealPlanPage() {
 
       <Card>
         <p className="text-slate-700 mb-4">{content?.summary}</p>
-        <div className="grid grid-cols-4 gap-3">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-3">
           <Stat label="Calorias" value={`${content?.total_calories ?? '—'} kcal`} />
           <Stat label="Proteína" value={`${content?.macros?.protein_g ?? '—'}g`} />
           <Stat label="Carboidratos" value={`${content?.macros?.carbs_g ?? '—'}g`} />
           <Stat label="Gorduras" value={`${content?.macros?.fat_g ?? '—'}g`} />
         </div>
+        {content?.daily_water_ml && (
+          <div className="flex items-center gap-2 mt-2 rounded-lg bg-blue-50 border border-blue-100 px-4 py-3">
+            <Droplets className="h-5 w-5 text-blue-500 shrink-0" />
+            <div>
+              <p className="text-sm font-medium text-blue-800">
+                Água diária recomendada: {content.daily_water_ml >= 1000
+                  ? `${(content.daily_water_ml / 1000).toFixed(1).replace('.', ',')} L`
+                  : `${content.daily_water_ml} ml`}
+              </p>
+              <p className="text-xs text-blue-600">Distribua ao longo do dia, especialmente antes e durante exercícios.</p>
+            </div>
+          </div>
+        )}
       </Card>
 
       <div className="space-y-3">

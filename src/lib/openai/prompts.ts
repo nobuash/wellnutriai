@@ -29,9 +29,23 @@ export function buildMealPlanPrompt(q: NutritionQuestionnaire, knowledgeContext 
     athlete: 'atleta',
   };
 
+  const allergyBlock = q.allergies.length
+    ? `⛔ ALERGIAS (PROIBIDO incluir qualquer desses alimentos ou derivados): ${q.allergies.join(', ')}`
+    : null;
+
+  const preferencesBlock = q.dietary_preferences.length
+    ? `✅ PREFERÊNCIAS (o plano DEVE respeitar): ${q.dietary_preferences.join(', ')}`
+    : null;
+
+  const dislikedBlock = q.disliked_foods.length
+    ? `🚫 ALIMENTOS QUE O USUÁRIO NÃO GOSTA (NUNCA incluir): ${q.disliked_foods.join(', ')}`
+    : null;
+
+  const restrictionsSection = [allergyBlock, preferencesBlock, dislikedBlock].filter(Boolean).join('\n');
+
   return `Você é um assistente nutricional educacional baseado em IA. Sua função é SUGERIR um plano alimentar informativo (nunca prescrever).
 
-${knowledgeContext ? `${knowledgeContext}\n\n` : ''}DADOS DO USUÁRIO:
+${restrictionsSection ? `⚠️ RESTRIÇÕES ABSOLUTAS — LEIA ANTES DE GERAR O PLANO:\n${restrictionsSection}\nEssas restrições são inegociáveis. Qualquer violação torna o plano inválido.\n\n` : ''}${knowledgeContext ? `${knowledgeContext}\n\n` : ''}DADOS DO USUÁRIO:
 - Idade: ${q.age} anos
 - Peso: ${q.weight} kg
 - Altura: ${q.height} cm
@@ -39,22 +53,21 @@ ${q.body_fat ? `- Gordura corporal: ${q.body_fat}%` : ''}
 - Objetivo: ${goalMap[q.goal]}
 - Nível de atividade: ${activityMap[q.activity_level]}
 - Refeições por dia: ${q.meals_per_day}
-- Alergias: ${q.allergies.length ? q.allergies.join(', ') : 'nenhuma informada'}
-- Preferências: ${q.dietary_preferences.length ? q.dietary_preferences.join(', ') : 'nenhuma'}
-- Alimentos evitados: ${q.disliked_foods.length ? q.disliked_foods.join(', ') : 'nenhum'}
 ${q.routine ? `- Rotina: ${q.routine}` : ''}
 
 INSTRUÇÕES:
 1. Calcule calorias sugeridas com base na fórmula Mifflin-St Jeor e fator de atividade.
 2. Ajuste conforme o objetivo (déficit ~15-20% para perda, superávit ~10% para ganho).
 3. Distribua em ${q.meals_per_day} refeições com horários sugeridos.
-4. Respeite TODAS as restrições (alergias, preferências, alimentos evitados).
-5. Use linguagem de SUGESTÃO, nunca prescrição.
+4. Respeite ABSOLUTAMENTE todas as restrições listadas acima.
+5. Calcule a ingestão diária de água recomendada (em ml) com base no peso e nível de atividade (base: 35ml/kg, +500ml se atividade intensa ou atleta).
+6. Use linguagem de SUGESTÃO, nunca prescrição.
 
 Retorne APENAS JSON válido, sem markdown, no formato:
 {
   "summary": "resumo breve em 1-2 frases",
   "total_calories": 2000,
+  "daily_water_ml": 2800,
   "macros": { "protein_g": 150, "carbs_g": 200, "fat_g": 60 },
   "meals": [
     {

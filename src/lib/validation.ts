@@ -23,7 +23,10 @@ export const questionnaireSchema = z.object({
   age: z.coerce.number().int().min(12).max(100),
   weight: z.coerce.number().min(30).max(300),
   height: z.coerce.number().min(100).max(250),
-  body_fat: z.coerce.number().min(3).max(60).optional().nullable(),
+  body_fat: z.preprocess(
+    (v) => (v === '' || v === null || v === undefined ? null : Number(v)),
+    z.number().min(3).max(60).nullable().optional()
+  ),
   goal: z.enum(['gain_muscle', 'lose_fat', 'maintain']),
   activity_level: z.enum(['sedentary', 'light', 'moderate', 'intense', 'athlete']),
   allergies: z.array(z.string()).default([]),

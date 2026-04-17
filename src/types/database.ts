@@ -40,6 +40,7 @@ export interface Meal {
 export interface MealPlanContent {
   summary: string;
   total_calories: number;
+  daily_water_ml?: number;
   macros: { protein_g: number; carbs_g: number; fat_g: number };
   meals: Meal[];
   observations: string[];
