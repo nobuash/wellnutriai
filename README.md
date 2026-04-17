@@ -212,3 +212,4 @@ FormData com `image` (JPEG/PNG/WebP, máx 5MB).
 ## 📜 Licença
 
 Proprietário. Todos os direitos reservados.
+# wellnutriai
