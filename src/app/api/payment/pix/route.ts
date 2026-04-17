@@ -17,6 +17,11 @@ export async function POST() {
 
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000';
 
+  const fullName = profile?.name ?? 'Usuário';
+  const nameParts = fullName.trim().split(' ');
+  const firstName = nameParts[0] ?? 'Usuário';
+  const lastName = nameParts.length > 1 ? nameParts.slice(1).join(' ') : 'WellNutri';
+
   try {
     const result = await getPayment().create({
       body: {
@@ -25,7 +30,8 @@ export async function POST() {
         payment_method_id: 'pix',
         payer: {
           email: profile?.email ?? user.email!,
-          first_name: profile?.name ?? 'Usuário',
+          first_name: firstName,
+          last_name: lastName,
         },
         external_reference: user.id,
         notification_url: `${appUrl}/api/payment/webhook`,
@@ -36,6 +42,11 @@ export async function POST() {
 
     const qrCode = result.point_of_interaction?.transaction_data?.qr_code;
     const qrCodeBase64 = result.point_of_interaction?.transaction_data?.qr_code_base64;
+
+    if (!qrCode) {
+      console.error('[payment/pix] QR code ausente na resposta:', JSON.stringify(result));
+      throw new Error('QR code não retornado pelo Mercado Pago');
+    }
 
     await supabase.from('subscriptions').upsert(
       {
@@ -50,7 +61,9 @@ export async function POST() {
 
     return NextResponse.json({ payment_id: result.id, qr_code: qrCode, qr_code_base64: qrCodeBase64 });
   } catch (err) {
+    const cause = (err as { cause?: unknown })?.cause;
     console.error('[payment/pix] error:', err);
+    if (cause) console.error('[payment/pix] cause:', JSON.stringify(cause));
     return NextResponse.json({ error: 'Não foi possível gerar o PIX. Tente novamente.' }, { status: 500 });
   }
 }
