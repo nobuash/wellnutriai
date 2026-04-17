@@ -47,35 +47,5 @@ export async function updateSession(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
-  // Logado em rota protegida: verificar aceite dos termos (BLOCKING FLOW)
-  if (user && isProtected) {
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('accepted_terms')
-      .eq('id', user.id)
-      .single();
-
-    if (!profile?.accepted_terms) {
-      const url = request.nextUrl.clone();
-      url.pathname = TERMS_ROUTE;
-      return NextResponse.redirect(url);
-    }
-  }
-
-  // Logado já aceitou termos mas está em /accept-terms → dashboard
-  if (user && pathname === TERMS_ROUTE) {
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('accepted_terms')
-      .eq('id', user.id)
-      .single();
-
-    if (profile?.accepted_terms) {
-      const url = request.nextUrl.clone();
-      url.pathname = '/dashboard';
-      return NextResponse.redirect(url);
-    }
-  }
-
   return response;
 }
