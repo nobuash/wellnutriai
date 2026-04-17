@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { Menu } from 'lucide-react';
 import { Sidebar } from './Sidebar';
+import { SocialLinks } from './SocialLinks';
 import type { Plan } from '@/types/database';
 
 interface AppShellProps {
@@ -40,6 +41,10 @@ export function AppShell({ plan, name, children }: AppShellProps) {
           <div className="mx-auto max-w-5xl p-4 md:p-8 space-y-6">
             {children}
           </div>
+          <footer className="border-t border-slate-100 py-4 px-8 flex items-center justify-center gap-6">
+            <SocialLinks />
+            <p className="text-xs text-slate-400">© {new Date().getFullYear()} WellNutriAI</p>
+          </footer>
         </main>
       </div>
     </div>

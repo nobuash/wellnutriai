@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import Image from 'next/image';
 import { Button } from '@/components/ui/Button';
+import { SocialLinks } from '@/components/SocialLinks';
 import { Brain, Camera, Check, MessageCircle, Sparkles } from 'lucide-react';
 
 export default function LandingPage() {
@@ -146,6 +147,7 @@ export default function LandingPage() {
 
       {/* FOOTER */}
       <footer className="border-t border-slate-200 py-8 text-center text-sm text-slate-500">
+        <SocialLinks className="justify-center mb-4" />
         <p>© {new Date().getFullYear()} WellNutriAI. Todos os direitos reservados.</p>
         <p className="mt-1 max-w-2xl mx-auto px-6">
           O WellNutriAI fornece sugestões alimentares geradas por IA com caráter informativo e
