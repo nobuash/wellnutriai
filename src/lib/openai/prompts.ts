@@ -30,22 +30,22 @@ export function buildMealPlanPrompt(q: NutritionQuestionnaire, knowledgeContext 
   };
 
   const allergyBlock = q.allergies.length
-    ? `⛔ ALERGIAS (PROIBIDO incluir qualquer desses alimentos ou derivados): ${q.allergies.join(', ')}`
-    : null;
-
-  const preferencesBlock = q.dietary_preferences.length
-    ? `✅ PREFERÊNCIAS (o plano DEVE respeitar): ${q.dietary_preferences.join(', ')}`
+    ? `⛔ ALERGIAS (PROIBIDO incluir esses alimentos ou qualquer derivado): ${q.allergies.join(', ')}`
     : null;
 
   const dislikedBlock = q.disliked_foods.length
-    ? `🚫 ALIMENTOS QUE O USUÁRIO NÃO GOSTA (NUNCA incluir): ${q.disliked_foods.join(', ')}`
+    ? `🚫 ALIMENTOS QUE O USUÁRIO NÃO GOSTA (NUNCA incluir no plano): ${q.disliked_foods.join(', ')}`
     : null;
 
-  const restrictionsSection = [allergyBlock, preferencesBlock, dislikedBlock].filter(Boolean).join('\n');
+  const prohibitionsSection = [allergyBlock, dislikedBlock].filter(Boolean).join('\n');
+
+  const preferencesBlock = q.dietary_preferences.length
+    ? `✅ PREFERÊNCIAS ALIMENTARES (o plano DEVE priorizar e incluir esses alimentos/estilos): ${q.dietary_preferences.join(', ')}`
+    : null;
 
   return `Você é um assistente nutricional educacional baseado em IA. Sua função é SUGERIR um plano alimentar informativo (nunca prescrever).
 
-${restrictionsSection ? `⚠️ RESTRIÇÕES ABSOLUTAS — LEIA ANTES DE GERAR O PLANO:\n${restrictionsSection}\nEssas restrições são inegociáveis. Qualquer violação torna o plano inválido.\n\n` : ''}${knowledgeContext ? `${knowledgeContext}\n\n` : ''}DADOS DO USUÁRIO:
+${prohibitionsSection ? `⚠️ PROIBIÇÕES ABSOLUTAS — NUNCA inclua esses itens:\n${prohibitionsSection}\n\n` : ''}${preferencesBlock ? `${preferencesBlock}\n\n` : ''}${knowledgeContext ? `${knowledgeContext}\n\n` : ''}DADOS DO USUÁRIO:
 - Idade: ${q.age} anos
 - Peso: ${q.weight} kg
 - Altura: ${q.height} cm
@@ -59,7 +59,7 @@ INSTRUÇÕES:
 1. Calcule calorias sugeridas com base na fórmula Mifflin-St Jeor e fator de atividade.
 2. Ajuste conforme o objetivo (déficit ~15-20% para perda, superávit ~10% para ganho).
 3. Distribua em ${q.meals_per_day} refeições com horários sugeridos.
-4. Respeite ABSOLUTAMENTE todas as restrições listadas acima.
+4. Respeite ABSOLUTAMENTE as proibições acima e priorize as preferências indicadas.
 5. Calcule a ingestão diária de água recomendada (em ml) com base no peso e nível de atividade (base: 35ml/kg, +500ml se atividade intensa ou atleta).
 6. Use linguagem de SUGESTÃO, nunca prescrição.
 
