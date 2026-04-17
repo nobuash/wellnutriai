@@ -53,7 +53,7 @@ export function Sidebar({ plan, name, isOpen, onClose }: SidebarProps) {
       )}>
         <div className="h-16 flex items-center justify-between px-6 border-b border-slate-200 font-bold">
           <Link href="/" className="flex items-center gap-2">
-            <Image src="/Logo WellNutri.png" alt="WellNutriAI" width={24} height={24} />
+            <Image src="/logo.png" alt="WellNutriAI" width={24} height={24} />
             WellNutriAI
           </Link>
           <button
