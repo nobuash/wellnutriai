@@ -6,6 +6,7 @@ import { createClient } from '@/lib/supabase/client';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { toast } from 'sonner';
+import { acceptTermsAction } from './actions';
 
 export default function AcceptTermsPage() {
   const router = useRouter();
@@ -16,30 +17,12 @@ export default function AcceptTermsPage() {
   async function handleAccept() {
     if (!checked) return;
     setLoading(true);
-
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) {
-      toast.error('Sessão expirada');
-      router.push('/login');
-      return;
-    }
-
-    const { error } = await supabase
-      .from('profiles')
-      .update({
-        accepted_terms: true,
-        accepted_terms_at: new Date().toISOString(),
-      })
-      .eq('id', user.id);
-
-    if (error) {
-      toast.error('Erro ao registrar aceite');
+    try {
+      await acceptTermsAction();
+    } catch {
+      toast.error('Erro ao registrar aceite. Tente novamente.');
       setLoading(false);
-      return;
     }
-
-    toast.success('Termos aceitos');
-    window.location.href = '/dashboard';
   }
 
   return (
