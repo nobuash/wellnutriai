@@ -54,6 +54,9 @@ export async function POST(req: Request) {
 
     const status = result.status;
 
+    const statusDetail = result.status_detail ?? '';
+    console.log(`[payment/card] status=${status} detail=${statusDetail} id=${result.id}`);
+
     if (status === 'approved') {
       const durationDays = plan.durationDays;
       const expiresAt = new Date();
@@ -74,7 +77,22 @@ export async function POST(req: Request) {
       await supabase.from('profiles').update({ plan: 'pro' }).eq('id', user.id);
     }
 
-    return NextResponse.json({ status, payment_id: result.id });
+    const rejectionMessages: Record<string, string> = {
+      cc_rejected_bad_filled_security_code: 'Código de segurança (CVV) incorreto.',
+      cc_rejected_bad_filled_date: 'Data de validade incorreta.',
+      cc_rejected_bad_filled_other: 'Dados do cartão incorretos. Verifique e tente novamente.',
+      cc_rejected_insufficient_amount: 'Saldo insuficiente no cartão.',
+      cc_rejected_high_risk: 'Pagamento recusado por segurança. Tente outro cartão ou use o PIX.',
+      cc_rejected_call_for_authorize: 'Ligue para o banco e autorize o pagamento, depois tente novamente.',
+      cc_rejected_card_disabled: 'Cartão desativado para compras online. Contate seu banco.',
+      cc_rejected_max_attempts: 'Muitas tentativas. Aguarde alguns minutos e tente novamente.',
+      cc_rejected_duplicated_payment: 'Pagamento duplicado detectado.',
+    };
+
+    const userMessage = rejectionMessages[statusDetail]
+      ?? (status !== 'approved' ? 'Pagamento não aprovado. Tente outro cartão ou use o PIX.' : null);
+
+    return NextResponse.json({ status, statusDetail, payment_id: result.id, userMessage });
   } catch (err) {
     const cause = (err as { cause?: unknown })?.cause;
     console.error('[payment/card] error:', err);

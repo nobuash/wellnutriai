@@ -41,10 +41,10 @@ export function CardPaymentModal({ planInterval, onClose }: Props) {
         onClose();
         router.refresh();
       } else if (data.status === 'in_process' || data.status === 'pending') {
-        toast.info('Pagamento em processamento. Você será notificado em breve.');
+        toast.info('Pagamento em processamento. Você receberá confirmação em breve.');
         onClose();
       } else {
-        toast.error('Pagamento não aprovado. Verifique os dados do cartão.');
+        toast.error(data.userMessage ?? 'Pagamento não aprovado. Tente outro cartão ou use o PIX.');
       }
     } catch {
       toast.error('Erro de conexão. Tente novamente.');
