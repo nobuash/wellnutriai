@@ -17,10 +17,9 @@ export default function AcceptTermsPage() {
   async function handleAccept() {
     if (!checked) return;
     setLoading(true);
-    try {
-      await acceptTermsAction();
-    } catch {
-      toast.error('Erro ao registrar aceite. Tente novamente.');
+    const result = await acceptTermsAction();
+    if (result?.error) {
+      toast.error(result.error);
       setLoading(false);
     }
   }

@@ -17,7 +17,7 @@ export async function acceptTermsAction() {
     })
     .eq('id', user.id);
 
-  if (error) throw new Error('Erro ao registrar aceite');
+  if (error) return { error: 'Erro ao registrar aceite' };
 
   redirect('/dashboard');
 }
