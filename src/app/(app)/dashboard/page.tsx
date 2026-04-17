@@ -34,14 +34,14 @@ export default async function DashboardPage() {
       .eq('user_id', user!.id)
       .order('created_at', { ascending: false })
       .limit(1)
-      .maybeSingle() as Promise<{ data: NutritionQuestionnaire | null }>,
+      .maybeSingle() as unknown as Promise<{ data: NutritionQuestionnaire | null }>,
     supabase
       .from('meal_plans')
       .select('*')
       .eq('user_id', user!.id)
       .order('created_at', { ascending: false })
       .limit(1)
-      .maybeSingle() as Promise<{ data: MealPlan | null }>,
+      .maybeSingle() as unknown as Promise<{ data: MealPlan | null }>,
     supabase.from('profiles').select('name, plan').eq('id', user!.id).single(),
   ]);
 
