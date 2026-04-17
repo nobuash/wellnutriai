@@ -24,7 +24,11 @@ export default function LoginPage() {
   async function onSubmit(data: LoginInput) {
     const { error } = await supabase.auth.signInWithPassword(data);
     if (error) {
-      toast.error('Credenciais inválidas');
+      if (error.message.toLowerCase().includes('email not confirmed')) {
+        toast.error('Confirme seu e-mail antes de entrar. Verifique sua caixa de entrada.');
+      } else {
+        toast.error('E-mail ou senha incorretos');
+      }
       return;
     }
     toast.success('Bem-vindo de volta!');
