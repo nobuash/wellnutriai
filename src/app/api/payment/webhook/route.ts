@@ -42,10 +42,13 @@ export async function POST(req: NextRequest) {
         rawInterval === 'quarterly' || rawInterval === 'annual' ? rawInterval : 'monthly';
       const status = payment.status as string; // approved | pending | rejected
 
+      console.log(`[webhook/payment] id=${payment.id} status=${status} method=${payment.payment_method_id} user=${userId} interval=${planInterval}`);
+
       if (status === 'approved') {
         const durationDays = PLANS[planInterval].durationDays;
         const expiresAt = new Date();
         expiresAt.setDate(expiresAt.getDate() + durationDays);
+        const paymentType = payment.payment_method_id === 'pix' ? 'pix' : 'card';
 
         await supabase.from('subscriptions').upsert(
           {
@@ -53,14 +56,14 @@ export async function POST(req: NextRequest) {
             plan: 'pro',
             mp_subscription_id: String(payment.id),
             mp_status: 'authorized',
-            payment_type: 'pix',
+            payment_type: paymentType,
             expires_at: expiresAt.toISOString(),
           },
           { onConflict: 'mp_subscription_id' }
         );
 
         await supabase.from('profiles').update({ plan: 'pro' }).eq('id', userId);
-        console.log(`[webhook/pix] user=${userId} aprovado, expira ${expiresAt.toISOString()}`);
+        console.log(`[webhook/payment] user=${userId} ativado como PRO, expira ${expiresAt.toISOString()}`);
       }
 
       return NextResponse.json({ ok: true });
