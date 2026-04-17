@@ -6,14 +6,18 @@ import { Input } from '@/components/ui/Input';
 import { createClient } from '@/lib/supabase/client';
 import { signupSchema, type SignupInput } from '@/lib/validation';
 import { zodResolver } from '@hookform/resolvers/zod';
+import { Turnstile, type TurnstileInstance } from '@marsidev/react-turnstile';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { useRef, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { toast } from 'sonner';
 
 export default function SignupPage() {
   const router = useRouter();
   const supabase = createClient();
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
+  const turnstileRef = useRef<TurnstileInstance>(undefined);
 
   const {
     register,
@@ -22,14 +26,24 @@ export default function SignupPage() {
   } = useForm<SignupInput>({ resolver: zodResolver(signupSchema) });
 
   async function onSubmit({ name, email, password }: SignupInput) {
+    if (!captchaToken) {
+      toast.error('Confirme que você não é um robô');
+      return;
+    }
+
     const { error } = await supabase.auth.signUp({
       email,
       password,
-      options: { data: { name } },
+      options: {
+        data: { name },
+        captchaToken,
+      },
     });
 
     if (error) {
       toast.error(error.message);
+      turnstileRef.current?.reset();
+      setCaptchaToken(null);
       return;
     }
 
@@ -74,6 +88,16 @@ export default function SignupPage() {
           {...register('confirmPassword')}
           error={errors.confirmPassword?.message}
         />
+
+        <div className="flex justify-center pt-1">
+          <Turnstile
+            ref={turnstileRef}
+            siteKey={process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY!}
+            onSuccess={(token) => setCaptchaToken(token)}
+            onExpire={() => setCaptchaToken(null)}
+            options={{ language: 'pt-BR' }}
+          />
+        </div>
 
         <Button type="submit" className="w-full" loading={isSubmitting}>
           Criar conta
