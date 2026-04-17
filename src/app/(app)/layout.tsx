@@ -8,16 +8,16 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect('/login');
 
+  if (!user.user_metadata?.accepted_terms) redirect('/accept-terms');
+
   const { data: profile } = await supabase
     .from('profiles')
-    .select('name, plan, accepted_terms')
+    .select('name, plan')
     .eq('id', user.id)
     .single();
 
-  if (!profile?.accepted_terms) redirect('/accept-terms');
-
   return (
-    <AppShell plan={profile.plan} name={profile.name}>
+    <AppShell plan={profile?.plan ?? 'free'} name={profile?.name ?? null}>
       <Disclaimer />
       {children}
     </AppShell>

@@ -23,23 +23,23 @@ export default function AcceptTermsPage() {
       return;
     }
 
-    const { error } = await supabase
-      .from('profiles')
-      .update({
+    // Atualiza o banco e os metadados do JWT ao mesmo tempo
+    const [{ error }, { error: metaError }] = await Promise.all([
+      supabase.from('profiles').update({
         accepted_terms: true,
         accepted_terms_at: new Date().toISOString(),
-      })
-      .eq('id', user.id);
+      }).eq('id', user.id),
+      supabase.auth.updateUser({ data: { accepted_terms: true } }),
+    ]);
 
-    if (error) {
+    if (error || metaError) {
       toast.error('Erro ao registrar aceite');
       setLoading(false);
       return;
     }
 
     toast.success('Termos aceitos!');
-    router.push('/dashboard');
-    router.refresh();
+    window.location.replace('/dashboard');
   }
 
   return (
