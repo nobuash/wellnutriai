@@ -9,6 +9,7 @@ import { useQuery, useMutation } from '@tanstack/react-query';
 import { AlertCircle, Check, Copy, CreditCard, QrCode, Sparkles, X } from 'lucide-react';
 import Image from 'next/image';
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 
 interface PixData {
@@ -248,8 +249,10 @@ export default function PricingPage() {
               <Copy className="h-4 w-4 mr-2" /> Copiar código PIX
             </Button>
 
+            <VerifyPixButton paymentId={pixData.payment_id} onActivated={() => setPixData(null)} />
+
             <p className="text-xs text-slate-400 text-center">
-              O QR code expira em 30 minutos. Após pagar, atualize a página.
+              O QR code expira em 30 minutos.
             </p>
           </div>
         </div>
@@ -263,5 +266,41 @@ export default function PricingPage() {
         />
       )}
     </div>
+  );
+}
+
+function VerifyPixButton({ paymentId, onActivated }: { paymentId: number; onActivated: () => void }) {
+  const router = useRouter();
+  const [loading, setLoading] = useState(false);
+
+  async function verify() {
+    setLoading(true);
+    try {
+      const res = await fetch('/api/payment/verify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ payment_id: paymentId }),
+      });
+      const data = await res.json();
+      if (data.activated) {
+        toast.success('Plano PRO ativado com sucesso!');
+        onActivated();
+        router.refresh();
+      } else if (data.status && data.status !== 'approved') {
+        toast.info('Pagamento ainda não confirmado. Aguarde alguns segundos e tente novamente.');
+      } else {
+        toast.error(data.error ?? 'Não foi possível verificar o pagamento.');
+      }
+    } catch {
+      toast.error('Erro de conexão. Tente novamente.');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <Button variant="outline" className="w-full" onClick={verify} loading={loading}>
+      Já paguei — verificar agora
+    </Button>
   );
 }
