@@ -27,7 +27,7 @@ export default async function DashboardPage() {
   const supabase = createClient();
   const { data: { user } } = await supabase.auth.getUser();
 
-  const [{ data: questionnaire }, { data: mealPlan }, { data: profile }] = await Promise.all([
+  const [{ data: questionnaire }, { data: mealPlan }, { data: profile }, { data: subscription }] = await Promise.all([
     supabase
       .from('nutrition_questionnaires')
       .select('*')
@@ -43,10 +43,28 @@ export default async function DashboardPage() {
       .limit(1)
       .maybeSingle() as unknown as Promise<{ data: MealPlan | null }>,
     supabase.from('profiles').select('name, plan').eq('id', user!.id).single(),
+    supabase
+      .from('subscriptions')
+      .select('expires_at, next_payment_date, payment_type, mp_status')
+      .eq('user_id', user!.id)
+      .eq('mp_status', 'authorized')
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle(),
   ]);
 
   const content = mealPlan?.content as MealPlanContent | undefined;
   const isPro = profile?.plan === 'pro';
+
+  const daysLeft = (() => {
+    if (!isPro) return null;
+    const expiresAt = subscription?.expires_at;
+    if (!expiresAt) return null;
+    const diff = new Date(expiresAt).getTime() - Date.now();
+    return Math.max(0, Math.ceil(diff / (1000 * 60 * 60 * 24)));
+  })();
+
+  const isRecurring = subscription?.payment_type === 'subscription';
   const waterLiters = questionnaire
     ? calcWaterLiters(questionnaire.age, questionnaire.weight)
     : null;
@@ -65,24 +83,32 @@ export default async function DashboardPage() {
           <p className="text-xs text-slate-500 uppercase">Plano</p>
           <div className="flex items-center gap-2 mt-1">
             {isPro ? (
-              <>
+              <Link href="/pricing" className="group flex items-center gap-2">
                 <span className="text-2xl font-bold text-brand-600">PRO</span>
-                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-brand-100 text-brand-700 text-xs font-semibold">
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-brand-100 text-brand-700 text-xs font-semibold group-hover:bg-brand-200 transition-colors">
                   <Sparkles className="h-3 w-3" /> Ativo
                 </span>
-              </>
+              </Link>
             ) : (
               <>
                 <span className="text-2xl font-bold text-slate-700">FREE</span>
-                <Link
-                  href="/pricing"
-                  className="text-xs text-brand-600 font-medium hover:underline"
-                >
+                <Link href="/pricing" className="text-xs text-brand-600 font-medium hover:underline">
                   Fazer upgrade →
                 </Link>
               </>
             )}
           </div>
+          {isPro && (
+            <p className="text-xs text-slate-500 mt-1">
+              {isRecurring
+                ? 'Renovação automática via cartão'
+                : daysLeft !== null
+                  ? daysLeft > 0
+                    ? `${daysLeft} dia${daysLeft !== 1 ? 's' : ''} restante${daysLeft !== 1 ? 's' : ''}`
+                    : 'Expira hoje — renove via PIX'
+                  : 'Acesso ativo'}
+            </p>
+          )}
         </Card>
 
         <Card>
