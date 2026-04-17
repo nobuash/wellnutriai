@@ -1,6 +1,7 @@
 import Link from 'next/link';
+import Image from 'next/image';
 import { Button } from '@/components/ui/Button';
-import { Apple, Brain, Camera, Check, MessageCircle, Sparkles } from 'lucide-react';
+import { Brain, Camera, Check, MessageCircle, Sparkles } from 'lucide-react';
 
 export default function LandingPage() {
   return (
@@ -9,7 +10,7 @@ export default function LandingPage() {
       <nav className="border-b border-slate-200 bg-white/80 backdrop-blur sticky top-0 z-10">
         <div className="mx-auto max-w-6xl px-6 h-16 flex items-center justify-between">
           <Link href="/" className="flex items-center gap-2 font-bold text-lg">
-            <Apple className="h-6 w-6 text-brand-600" />
+            <Image src="/Logo WellNutri.png" alt="WellNutriAI" width={28} height={28} />
             WellNutriAI
           </Link>
           <div className="flex items-center gap-3">
@@ -87,11 +88,12 @@ export default function LandingPage() {
       <section id="como-funciona" className="bg-slate-50 py-20">
         <div className="mx-auto max-w-6xl px-6">
           <h2 className="text-3xl font-bold text-center mb-12">Como funciona</h2>
-          <div className="grid md:grid-cols-3 gap-8">
+          <div className="grid sm:grid-cols-2 md:grid-cols-4 gap-8">
             {[
               { n: '1', t: 'Crie sua conta', d: 'Cadastre-se em segundos e aceite os termos de uso.' },
               { n: '2', t: 'Responda o questionário', d: 'Nos conte sobre seus objetivos, rotina e preferências alimentares.' },
               { n: '3', t: 'Receba seu plano', d: 'A IA gera um plano alimentar sugerido, pronto para você seguir.' },
+              { n: '4', t: 'Analise sua refeição', d: 'Tire uma foto do seu prato e descubra as calorias e nutrientes estimados.' },
             ].map((s) => (
               <div key={s.n} className="text-center">
                 <div className="h-12 w-12 mx-auto rounded-full bg-brand-600 text-white flex items-center justify-center text-lg font-bold mb-4">
@@ -113,7 +115,7 @@ export default function LandingPage() {
             name="Free"
             price="R$ 0"
             desc="Para conhecer a plataforma"
-            features={['1 plano alimentar sugerido', 'Chat limitado', 'Sem análise por foto']}
+            features={['1 plano alimentar sugerido', 'Plano não pode ser alterado após gerado', 'Chat limitado', 'Sem análise por foto']}
             cta="Começar grátis"
             ctaHref="/signup"
           />
@@ -122,7 +124,7 @@ export default function LandingPage() {
             name="Pro"
             price="R$ 29,90/mês"
             desc="Experiência completa"
-            features={['Planos ilimitados', 'Chat completo', 'Análise por foto', 'Suporte prioritário']}
+            features={['Planos ilimitados e editáveis', 'Chat completo', 'Análise por foto', 'Suporte prioritário']}
             cta="Assinar Pro"
             ctaHref="/signup"
           />
