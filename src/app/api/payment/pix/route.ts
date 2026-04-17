@@ -1,13 +1,21 @@
-import { getPayment, PRO_PLAN } from '@/lib/mercadopago/client';
+import { getPayment, PLANS, type PlanInterval } from '@/lib/mercadopago/client';
 import { createClient } from '@/lib/supabase/server';
 import { NextResponse } from 'next/server';
 
 export const runtime = 'nodejs';
 
-export async function POST() {
+export async function POST(req: Request) {
   const supabase = createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: 'Não autenticado' }, { status: 401 });
+
+  const body = await req.json().catch(() => ({})) as { planInterval?: string };
+  const planInterval: PlanInterval =
+    body.planInterval === 'quarterly' || body.planInterval === 'annual'
+      ? body.planInterval
+      : 'monthly';
+
+  const plan = PLANS[planInterval];
 
   const { data: profile } = await supabase
     .from('profiles')
@@ -25,15 +33,16 @@ export async function POST() {
   try {
     const result = await getPayment().create({
       body: {
-        transaction_amount: PRO_PLAN.amount,
-        description: PRO_PLAN.label,
+        transaction_amount: plan.amount,
+        description: plan.label,
         payment_method_id: 'pix',
         payer: {
           email: profile?.email ?? user.email!,
           first_name: firstName,
           last_name: lastName,
         },
-        external_reference: user.id,
+        // Encode planInterval in external_reference so webhook knows the duration
+        external_reference: `${user.id}:${planInterval}`,
         notification_url: `${appUrl}/api/payment/webhook`,
       },
     });

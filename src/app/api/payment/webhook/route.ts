@@ -1,4 +1,4 @@
-import { getPayment, getPreApproval } from '@/lib/mercadopago/client';
+import { getPayment, getPreApproval, PLANS, type PlanInterval } from '@/lib/mercadopago/client';
 import { verifyMPSignature } from '@/lib/mercadopago/webhook';
 import { createClient as createServerClient } from '@supabase/supabase-js';
 import { NextRequest, NextResponse } from 'next/server';
@@ -36,12 +36,16 @@ export async function POST(req: NextRequest) {
       const payment = await getPayment().get({ id: Number(dataId) });
       if (!payment?.id || !payment.external_reference) return NextResponse.json({ ok: true });
 
-      const userId = payment.external_reference as string;
+      const externalRef = payment.external_reference as string;
+      const [userId, rawInterval = 'monthly'] = externalRef.split(':');
+      const planInterval: PlanInterval =
+        rawInterval === 'quarterly' || rawInterval === 'annual' ? rawInterval : 'monthly';
       const status = payment.status as string; // approved | pending | rejected
 
       if (status === 'approved') {
+        const durationDays = PLANS[planInterval].durationDays;
         const expiresAt = new Date();
-        expiresAt.setDate(expiresAt.getDate() + 30);
+        expiresAt.setDate(expiresAt.getDate() + durationDays);
 
         await supabase.from('subscriptions').upsert(
           {

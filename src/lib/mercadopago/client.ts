@@ -15,8 +15,49 @@ export function getPayment() {
   return new Payment(getMpClient());
 }
 
-export const PRO_PLAN = {
-  amount: 29.9,
-  currency: 'BRL',
-  label: 'WellNutriAI PRO — 30 dias',
-} as const;
+export type PlanInterval = 'monthly' | 'quarterly' | 'annual';
+
+export const PLANS: Record<PlanInterval, {
+  label: string;
+  displayLabel: string;
+  amount: number;
+  monthlyAmount: number;
+  currency: 'BRL';
+  durationDays: number;
+  frequencyMonths: number;
+  discountPercent: number;
+}> = {
+  monthly: {
+    label: 'WellNutriAI PRO — Mensal',
+    displayLabel: 'Mensal',
+    amount: 29.90,
+    monthlyAmount: 29.90,
+    currency: 'BRL',
+    durationDays: 30,
+    frequencyMonths: 1,
+    discountPercent: 0,
+  },
+  quarterly: {
+    label: 'WellNutriAI PRO — Trimestral',
+    displayLabel: 'Trimestral',
+    amount: 74.45,
+    monthlyAmount: 24.82,
+    currency: 'BRL',
+    durationDays: 90,
+    frequencyMonths: 3,
+    discountPercent: 17,
+  },
+  annual: {
+    label: 'WellNutriAI PRO — Anual',
+    displayLabel: 'Anual',
+    amount: 204.52,
+    monthlyAmount: 17.04,
+    currency: 'BRL',
+    durationDays: 365,
+    frequencyMonths: 12,
+    discountPercent: 43,
+  },
+};
+
+// Backwards compat
+export const PRO_PLAN = PLANS.monthly;

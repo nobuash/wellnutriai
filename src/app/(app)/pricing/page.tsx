@@ -2,6 +2,7 @@
 
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
+import { PLANS, type PlanInterval } from '@/lib/mercadopago/client';
 import { createClient } from '@/lib/supabase/client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { AlertCircle, Check, Copy, QrCode, Sparkles, X } from 'lucide-react';
@@ -15,10 +16,23 @@ interface PixData {
   qr_code_base64: string;
 }
 
+const INTERVAL_LABELS: Record<PlanInterval, string> = {
+  monthly: 'Mensal',
+  quarterly: 'Trimestral',
+  annual: 'Anual',
+};
+
+function formatBRL(value: number) {
+  return value.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
 export default function PricingPage() {
   const supabase = createClient();
   const qc = useQueryClient();
   const [pixData, setPixData] = useState<PixData | null>(null);
+  const [selectedInterval, setSelectedInterval] = useState<PlanInterval>('monthly');
+
+  const plan = PLANS[selectedInterval];
 
   const { data: profile } = useQuery({
     queryKey: ['profile'],
@@ -49,8 +63,12 @@ export default function PricingPage() {
   });
 
   const subscribe = useMutation({
-    mutationFn: async () => {
-      const res = await fetch('/api/payment/subscribe', { method: 'POST' });
+    mutationFn: async (planInterval: PlanInterval) => {
+      const res = await fetch('/api/payment/subscribe', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ planInterval }),
+      });
       if (!res.ok) { const j = await res.json(); throw new Error(j.error ?? 'Erro'); }
       const { init_point } = await res.json() as { init_point: string };
       return init_point;
@@ -60,8 +78,12 @@ export default function PricingPage() {
   });
 
   const pixMutation = useMutation({
-    mutationFn: async () => {
-      const res = await fetch('/api/payment/pix', { method: 'POST' });
+    mutationFn: async (planInterval: PlanInterval) => {
+      const res = await fetch('/api/payment/pix', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ planInterval }),
+      });
       if (!res.ok) { const j = await res.json(); throw new Error(j.error ?? 'Erro'); }
       return res.json() as Promise<PixData>;
     },
@@ -118,11 +140,49 @@ export default function PricingPage() {
 
         {/* Pro */}
         <Card className="border-brand-500 ring-1 ring-brand-500">
-          <div className="flex items-center gap-2 mb-1">
+          <div className="flex items-center gap-2 mb-3">
             <h3 className="font-bold text-lg">Pro</h3>
             <Sparkles className="h-4 w-4 text-brand-600" />
           </div>
-          <p className="text-3xl font-bold mb-1">R$ 29,90<span className="text-base font-normal text-slate-500">/mês</span></p>
+
+          {/* Seletor de intervalo */}
+          {currentPlan !== 'pro' && (
+            <div className="flex rounded-lg border border-slate-200 p-1 mb-4 bg-slate-50">
+              {(Object.keys(PLANS) as PlanInterval[]).map((interval) => (
+                <button
+                  key={interval}
+                  onClick={() => setSelectedInterval(interval)}
+                  className={`flex-1 relative rounded-md py-1.5 text-xs font-medium transition-all ${
+                    selectedInterval === interval
+                      ? 'bg-white text-brand-700 shadow-sm'
+                      : 'text-slate-500 hover:text-slate-700'
+                  }`}
+                >
+                  {INTERVAL_LABELS[interval]}
+                  {PLANS[interval].discountPercent > 0 && (
+                    <span className="absolute -top-2 -right-1 px-1 py-0 rounded text-[9px] font-bold bg-green-500 text-white leading-4">
+                      -{PLANS[interval].discountPercent}%
+                    </span>
+                  )}
+                </button>
+              ))}
+            </div>
+          )}
+
+          {/* Preço */}
+          <div className="mb-1">
+            <p className="text-3xl font-bold">
+              R$ {formatBRL(plan.monthlyAmount)}
+              <span className="text-base font-normal text-slate-500">/mês</span>
+            </p>
+            {plan.discountPercent > 0 && (
+              <p className="text-sm text-slate-500">
+                Cobrado R$ {formatBRL(plan.amount)}{' '}
+                {selectedInterval === 'quarterly' ? 'a cada 3 meses' : 'por ano'}
+                {' '}· <span className="text-green-600 font-medium">economia de {plan.discountPercent}%</span>
+              </p>
+            )}
+          </div>
 
           {currentPlan === 'pro' && expiresAt && (
             <p className="text-xs text-slate-500 mb-4">
@@ -130,7 +190,7 @@ export default function PricingPage() {
             </p>
           )}
 
-          <ul className="space-y-2 mb-6">
+          <ul className="space-y-2 mb-6 mt-4">
             {['Planos ilimitados e editáveis', 'Chat IA sem limites', 'Análise por foto', 'Suporte prioritário'].map((f) => (
               <li key={f} className="flex items-center gap-2 text-sm text-slate-700">
                 <Check className="h-4 w-4 text-brand-600 shrink-0" />{f}
@@ -142,7 +202,7 @@ export default function PricingPage() {
             <div className="space-y-3">
               <Button className="w-full" disabled>Plano atual</Button>
               {isPix && expiresAt && (
-                <Button className="w-full" loading={pixMutation.isPending} onClick={() => pixMutation.mutate()}>
+                <Button className="w-full" loading={pixMutation.isPending} onClick={() => pixMutation.mutate('monthly')}>
                   Renovar via PIX
                 </Button>
               )}
@@ -158,15 +218,15 @@ export default function PricingPage() {
             </div>
           ) : (
             <div className="space-y-3">
-              <Button className="w-full" loading={subscribe.isPending} onClick={() => subscribe.mutate()}>
+              <Button className="w-full" loading={subscribe.isPending} onClick={() => subscribe.mutate(selectedInterval)}>
                 Assinar via Cartão
               </Button>
               <Button
                 className="w-full" variant="outline"
                 loading={pixMutation.isPending}
-                onClick={() => pixMutation.mutate()}
+                onClick={() => pixMutation.mutate(selectedInterval)}
               >
-                <QrCode className="h-4 w-4 mr-2" /> Pagar via PIX (30 dias)
+                <QrCode className="h-4 w-4 mr-2" /> Pagar via PIX
               </Button>
             </div>
           )}
@@ -178,7 +238,7 @@ export default function PricingPage() {
           <AlertCircle className="h-4 w-4 shrink-0 mt-0.5 text-slate-400" />
           <p>
             O pagamento é processado com segurança pelo <strong>Mercado Pago</strong>.
-            Não armazenamos dados do seu cartão. O PIX ativa o PRO por 30 dias e pode ser renovado a qualquer momento.
+            Não armazenamos dados do seu cartão. O PIX ativa o PRO pelo período escolhido e pode ser renovado a qualquer momento.
           </p>
         </div>
       </Card>
