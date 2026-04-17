@@ -2,10 +2,11 @@
 
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
+import { CardPaymentModal } from '@/components/CardPaymentModal';
 import { PLANS, type PlanInterval } from '@/lib/mercadopago/client';
 import { createClient } from '@/lib/supabase/client';
 import { useQuery, useMutation } from '@tanstack/react-query';
-import { AlertCircle, Check, Copy, QrCode, Sparkles, X } from 'lucide-react';
+import { AlertCircle, Check, Copy, CreditCard, QrCode, Sparkles, X } from 'lucide-react';
 import Image from 'next/image';
 import { useState } from 'react';
 import { toast } from 'sonner';
@@ -28,8 +29,9 @@ function formatBRL(value: number) {
 
 export default function PricingPage() {
   const supabase = createClient();
-const [pixData, setPixData] = useState<PixData | null>(null);
+  const [pixData, setPixData] = useState<PixData | null>(null);
   const [selectedInterval, setSelectedInterval] = useState<PlanInterval>('annual');
+  const [showCardModal, setShowCardModal] = useState(false);
 
   const plan = PLANS[selectedInterval];
 
@@ -61,20 +63,6 @@ const [pixData, setPixData] = useState<PixData | null>(null);
     enabled: profile?.plan === 'pro',
   });
 
-  const subscribe = useMutation({
-    mutationFn: async (planInterval: PlanInterval) => {
-      const res = await fetch('/api/payment/subscribe', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ planInterval }),
-      });
-      if (!res.ok) { const j = await res.json(); throw new Error(j.error ?? 'Erro'); }
-      const { init_point } = await res.json() as { init_point: string };
-      return init_point;
-    },
-    onSuccess: (url) => { window.location.href = url; },
-    onError: (err: Error) => toast.error(err.message),
-  });
 
   const pixMutation = useMutation({
     mutationFn: async (planInterval: PlanInterval) => {
@@ -191,12 +179,8 @@ const [pixData, setPixData] = useState<PixData | null>(null);
           {currentPlan === 'pro' ? (
             <div className="space-y-3">
               <Button className="w-full" disabled>Plano atual</Button>
-              <Button
-                className="w-full" variant="outline"
-                loading={subscribe.isPending}
-                onClick={() => subscribe.mutate(selectedInterval)}
-              >
-                Renovar via Cartão
+              <Button className="w-full" variant="outline" onClick={() => setShowCardModal(true)}>
+                <CreditCard className="h-4 w-4 mr-2" /> Renovar via Cartão
               </Button>
               <Button
                 className="w-full" variant="outline"
@@ -208,8 +192,8 @@ const [pixData, setPixData] = useState<PixData | null>(null);
             </div>
           ) : (
             <div className="space-y-3">
-              <Button className="w-full" loading={subscribe.isPending} onClick={() => subscribe.mutate(selectedInterval)}>
-                Pagar via Cartão
+              <Button className="w-full" onClick={() => setShowCardModal(true)}>
+                <CreditCard className="h-4 w-4 mr-2" /> Pagar via Cartão
               </Button>
               <Button
                 className="w-full" variant="outline"
@@ -269,6 +253,14 @@ const [pixData, setPixData] = useState<PixData | null>(null);
             </p>
           </div>
         </div>
+      )}
+
+      {/* Modal Cartão */}
+      {showCardModal && (
+        <CardPaymentModal
+          planInterval={selectedInterval}
+          onClose={() => setShowCardModal(false)}
+        />
       )}
     </div>
   );
