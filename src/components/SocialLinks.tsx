@@ -22,7 +22,7 @@ export function SocialLinks({ className = '' }: { className?: string }) {
         <Instagram className="h-5 w-5" />
       </Link>
       <Link
-        href="https://tiktok.com/@wellnutriai"
+        href="https://tiktok.com/@wellnutri.ai"
         target="_blank"
         rel="noopener noreferrer"
         aria-label="TikTok WellNutriAI"
