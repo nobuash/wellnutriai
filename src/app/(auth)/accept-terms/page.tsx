@@ -39,8 +39,7 @@ export default function AcceptTermsPage() {
     }
 
     toast.success('Termos aceitos');
-    router.push('/dashboard');
-    router.refresh();
+    window.location.href = '/dashboard';
   }
 
   return (

@@ -6,18 +6,14 @@ import { Input } from '@/components/ui/Input';
 import { createClient } from '@/lib/supabase/client';
 import { loginSchema, type LoginInput } from '@/lib/validation';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Turnstile, type TurnstileInstance } from '@marsidev/react-turnstile';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useRef, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { toast } from 'sonner';
 
 export default function LoginPage() {
   const router = useRouter();
   const supabase = createClient();
-  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
-  const turnstileRef = useRef<TurnstileInstance>(undefined);
 
   const {
     register,
@@ -26,23 +22,11 @@ export default function LoginPage() {
   } = useForm<LoginInput>({ resolver: zodResolver(loginSchema) });
 
   async function onSubmit(data: LoginInput) {
-    if (!captchaToken) {
-      toast.error('Confirme que você não é um robô');
-      return;
-    }
-
-    const { error } = await supabase.auth.signInWithPassword({
-      ...data,
-      options: { captchaToken },
-    });
-
+    const { error } = await supabase.auth.signInWithPassword(data);
     if (error) {
       toast.error('Credenciais inválidas');
-      turnstileRef.current?.reset();
-      setCaptchaToken(null);
       return;
     }
-
     toast.success('Bem-vindo de volta!');
     router.push('/dashboard');
     router.refresh();
@@ -68,17 +52,6 @@ export default function LoginPage() {
           {...register('password')}
           error={errors.password?.message}
         />
-
-        <div className="flex justify-center pt-1">
-          <Turnstile
-            ref={turnstileRef}
-            siteKey={process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY!}
-            onSuccess={(token) => setCaptchaToken(token)}
-            onExpire={() => setCaptchaToken(null)}
-            options={{ language: 'pt-BR' }}
-          />
-        </div>
-
         <Button type="submit" className="w-full" loading={isSubmitting}>
           Entrar
         </Button>
