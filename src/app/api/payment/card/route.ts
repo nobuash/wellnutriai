@@ -47,6 +47,8 @@ export async function POST(req: Request) {
         },
         external_reference: `${user.id}:${planInterval}`,
         notification_url: `${appUrl}/api/payment/webhook`,
+        three_d_secure_mode: 'optional',
+        binary_mode: false,
       },
     });
 
@@ -92,7 +94,13 @@ export async function POST(req: Request) {
     const userMessage = rejectionMessages[statusDetail]
       ?? (status !== 'approved' ? 'Pagamento não aprovado. Tente outro cartão ou use o PIX.' : null);
 
-    return NextResponse.json({ status, statusDetail, payment_id: result.id, userMessage });
+    // 3DS: redireciona para autenticação do banco se necessário
+    const resultAny = result as unknown as Record<string, unknown>;
+    const threedsUrl = resultAny?.three_ds_info
+      ? (resultAny.three_ds_info as Record<string, string>)?.external_resource_url
+      : null;
+
+    return NextResponse.json({ status, statusDetail, payment_id: result.id, userMessage, threedsUrl });
   } catch (err) {
     const cause = (err as { cause?: unknown })?.cause;
     console.error('[payment/card] error:', err);
