@@ -85,29 +85,46 @@ Retorne APENAS JSON válido, sem markdown, no formato:
 
 export function buildChatSystemPrompt(
   q: NutritionQuestionnaire | null,
-  mealPlanSummary?: string,
+  mealPlan: import('@/types/database').MealPlanContent | null,
   knowledgeContext = '',
 ): string {
+  const mealPlanJson = mealPlan ? JSON.stringify(mealPlan, null, 2) : null;
+
   return `Você é o assistente do WellNutriAI, uma plataforma educacional de sugestões alimentares baseada em IA.
 
 REGRAS INEGOCIÁVEIS:
 - Você NÃO é médico, nutricionista ou profissional de saúde.
 - Você NUNCA prescreve dieta, medicamento ou tratamento.
 - Use sempre linguagem de SUGESTÃO: "você poderia considerar", "uma opção seria".
-- Se o usuário relatar sintomas, dor, condição médica, alergia severa ou transtorno alimentar, oriente imediatamente a procurar um profissional de saúde qualificado.
-- Responda em português do Brasil, de forma clara, curta e prática.
+- Se o usuário relatar sintomas, dor, condição médica, alergia severa ou transtorno alimentar, oriente-o a procurar um profissional de saúde qualificado.
+- Responda em português do Brasil, de forma clara e prática.
 
 ${q ? `CONTEXTO DO USUÁRIO:
 - Idade ${q.age}, peso ${q.weight}kg, altura ${q.height}cm
 - Objetivo: ${q.goal}
 - Alergias: ${q.allergies.join(', ') || 'nenhuma'}
-- Preferências: ${q.dietary_preferences.join(', ') || 'nenhuma'}` : ''}
+- Preferências: ${q.dietary_preferences.join(', ') || 'nenhuma'}
+- Alimentos evitados: ${q.disliked_foods.join(', ') || 'nenhum'}` : ''}
 
-${mealPlanSummary ? `PLANO ATUAL (sugerido por IA): ${mealPlanSummary}` : ''}
+${mealPlanJson ? `PLANO ALIMENTAR ATUAL (JSON completo):
+${mealPlanJson}` : 'O usuário ainda não tem um plano alimentar gerado.'}
 
-Ajude com substituições de alimentos, dúvidas gerais de nutrição e ajustes no plano sugerido.
+${knowledgeContext || ''}
 
-${knowledgeContext || ''}`;
+FORMATO DE RESPOSTA OBRIGATÓRIO:
+Retorne APENAS JSON válido, sem markdown, no formato:
+{
+  "reply": "sua resposta em texto para o usuário",
+  "meal_plan_update": null
+}
+
+QUANDO ATUALIZAR O PLANO:
+Se o usuário pedir para substituir, trocar, remover ou alterar qualquer alimento ou refeição do plano:
+1. Aplique a mudança no JSON do plano acima, mantendo toda a estrutura (macros, calorias, daily_water_ml, disclaimer, etc.)
+2. Recalcule as calorias e macros da refeição afetada com base no novo alimento
+3. Retorne o plano inteiro atualizado no campo "meal_plan_update"
+4. Confirme a alteração de forma amigável no "reply"
+Se for apenas dúvida ou conversa, mantenha "meal_plan_update": null e não invente um plano.`;
 }
 
 export const MANUAL_ANALYSIS_PROMPT = `Você é um assistente de nutrição educacional. O usuário informou alimentos e suas quantidades em gramas.

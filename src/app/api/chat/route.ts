@@ -66,13 +66,13 @@ export async function POST(req: Request) {
     { data: ChatMessage[] | null },
   ];
 
-  const summary = (mealPlan?.content as MealPlanContent | undefined)?.summary;
+  const mealPlanContent = (mealPlan?.content as MealPlanContent | undefined) ?? null;
 
   // Busca semântica na base de conhecimento científico
   const knowledgeChunks = await searchKnowledge(parsed.data.message);
   const knowledgeContext = formatKnowledgeContext(knowledgeChunks);
 
-  const systemPrompt = buildChatSystemPrompt(questionnaire, summary, knowledgeContext);
+  const systemPrompt = buildChatSystemPrompt(questionnaire, mealPlanContent, knowledgeContext);
 
   const historyMessages = (history ?? []).reverse().map((m) => ({
     role: m.role === 'ai' ? ('assistant' as const) : ('user' as const),
@@ -87,7 +87,8 @@ export async function POST(req: Request) {
 
     const completion = await openai.chat.completions.create({
       model: MODELS.TEXT,
-      temperature: 0.7,
+      response_format: { type: 'json_object' },
+      temperature: 0.5,
       messages: [
         { role: 'system', content: systemPrompt },
         ...historyMessages,
@@ -95,13 +96,39 @@ export async function POST(req: Request) {
       ],
     });
 
-    const reply = completion.choices[0]?.message?.content ?? 'Desculpe, não consegui processar.';
+    const raw = completion.choices[0]?.message?.content ?? '{}';
+    let reply = 'Desculpe, não consegui processar.';
+    let mealPlanUpdated = false;
+
+    try {
+      const parsed2 = JSON.parse(raw) as { reply?: string; meal_plan_update?: MealPlanContent | null };
+      reply = parsed2.reply ?? reply;
+
+      if (parsed2.meal_plan_update && mealPlan?.id) {
+        const updatedContent: MealPlanContent = {
+          ...parsed2.meal_plan_update,
+          disclaimer: parsed2.meal_plan_update.disclaimer || mealPlanContent?.disclaimer || '',
+        };
+
+        await supabase
+          .from('meal_plans')
+          .update({
+            content: updatedContent,
+            calories_estimate: updatedContent.total_calories ?? null,
+          })
+          .eq('id', mealPlan.id);
+
+        mealPlanUpdated = true;
+      }
+    } catch {
+      reply = raw;
+    }
 
     await supabase.from('chat_messages').insert({
       user_id: user.id, role: 'ai', message: reply,
     });
 
-    return NextResponse.json({ reply });
+    return NextResponse.json({ reply, mealPlanUpdated });
   } catch (err) {
     console.error('[chat] error:', err);
     return NextResponse.json({ error: 'Falha no chat' }, { status: 500 });

@@ -55,10 +55,14 @@ export default function ChatPage() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Erro no envio');
-      return data.reply as string;
+      return data as { reply: string; mealPlanUpdated: boolean };
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       qc.invalidateQueries({ queryKey: ['chat-messages'] });
+      if (data.mealPlanUpdated) {
+        qc.invalidateQueries({ queryKey: ['meal-plan-latest'] });
+        toast.success('Plano alimentar atualizado! Veja na aba Plano.');
+      }
       setInput('');
     },
     onError: (err: Error) => toast.error(err.message),
