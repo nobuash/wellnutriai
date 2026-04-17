@@ -1,10 +1,14 @@
-import { MercadoPagoConfig, Payment, PreApproval } from 'mercadopago';
+import { MercadoPagoConfig, Payment, Preference, PreApproval } from 'mercadopago';
 
 function getMpClient() {
   if (!process.env.MP_ACCESS_TOKEN) {
     throw new Error('MP_ACCESS_TOKEN não configurado');
   }
   return new MercadoPagoConfig({ accessToken: process.env.MP_ACCESS_TOKEN });
+}
+
+export function getPreference() {
+  return new Preference(getMpClient());
 }
 
 export function getPreApproval() {

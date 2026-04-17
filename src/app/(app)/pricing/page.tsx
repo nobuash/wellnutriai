@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { PLANS, type PlanInterval } from '@/lib/mercadopago/client';
 import { createClient } from '@/lib/supabase/client';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useMutation } from '@tanstack/react-query';
 import { AlertCircle, Check, Copy, QrCode, Sparkles, X } from 'lucide-react';
 import Image from 'next/image';
 import { useState } from 'react';
@@ -28,8 +28,7 @@ function formatBRL(value: number) {
 
 export default function PricingPage() {
   const supabase = createClient();
-  const qc = useQueryClient();
-  const [pixData, setPixData] = useState<PixData | null>(null);
+const [pixData, setPixData] = useState<PixData | null>(null);
   const [selectedInterval, setSelectedInterval] = useState<PlanInterval>('annual');
 
   const plan = PLANS[selectedInterval];
@@ -91,21 +90,7 @@ export default function PricingPage() {
     onError: (err: Error) => toast.error(err.message),
   });
 
-  const cancel = useMutation({
-    mutationFn: async () => {
-      const res = await fetch('/api/payment/cancel', { method: 'POST' });
-      if (!res.ok) { const j = await res.json(); throw new Error(j.error ?? 'Erro'); }
-    },
-    onSuccess: () => {
-      toast.success('Assinatura cancelada.');
-      qc.invalidateQueries({ queryKey: ['profile'] });
-      qc.invalidateQueries({ queryKey: ['active-subscription'] });
-    },
-    onError: (err: Error) => toast.error(err.message),
-  });
-
   const currentPlan = profile?.plan ?? 'free';
-  const isPix = activeSub?.payment_type === 'pix';
   const expiresAt = activeSub?.expires_at ? new Date(activeSub.expires_at) : null;
 
   function copyPix() {
@@ -206,25 +191,25 @@ export default function PricingPage() {
           {currentPlan === 'pro' ? (
             <div className="space-y-3">
               <Button className="w-full" disabled>Plano atual</Button>
-              {isPix && expiresAt && (
-                <Button className="w-full" loading={pixMutation.isPending} onClick={() => pixMutation.mutate('monthly')}>
-                  Renovar via PIX
-                </Button>
-              )}
-              {!isPix && activeSub && (
-                <Button
-                  className="w-full" variant="outline"
-                  loading={cancel.isPending}
-                  onClick={() => window.confirm('Cancelar assinatura PRO?') && cancel.mutate()}
-                >
-                  Cancelar assinatura
-                </Button>
-              )}
+              <Button
+                className="w-full" variant="outline"
+                loading={subscribe.isPending}
+                onClick={() => subscribe.mutate(selectedInterval)}
+              >
+                Renovar via Cartão
+              </Button>
+              <Button
+                className="w-full" variant="outline"
+                loading={pixMutation.isPending}
+                onClick={() => pixMutation.mutate(selectedInterval)}
+              >
+                <QrCode className="h-4 w-4 mr-2" /> Renovar via PIX
+              </Button>
             </div>
           ) : (
             <div className="space-y-3">
               <Button className="w-full" loading={subscribe.isPending} onClick={() => subscribe.mutate(selectedInterval)}>
-                Assinar via Cartão
+                Pagar via Cartão
               </Button>
               <Button
                 className="w-full" variant="outline"
