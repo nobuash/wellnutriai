@@ -1,4 +1,4 @@
-import { preApproval } from '@/lib/mercadopago/client';
+import { getPreApproval } from '@/lib/mercadopago/client';
 import { verifyMPSignature } from '@/lib/mercadopago/webhook';
 import { createClient as createServerClient } from '@supabase/supabase-js';
 import { NextRequest, NextResponse } from 'next/server';
@@ -42,7 +42,7 @@ export async function POST(req: NextRequest) {
 
   try {
     // 3. Busca os detalhes atualizados da assinatura no MP
-    const sub = await preApproval.get({ id: String(dataId) });
+    const sub = await getPreApproval().get({ id: String(dataId) });
 
     if (!sub?.id || !sub.external_reference) {
       return NextResponse.json({ error: 'Assinatura inválida' }, { status: 400 });

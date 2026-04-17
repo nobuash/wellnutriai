@@ -1,4 +1,4 @@
-import { preApproval } from '@/lib/mercadopago/client';
+import { getPreApproval } from '@/lib/mercadopago/client';
 import { createClient } from '@/lib/supabase/server';
 import { NextResponse } from 'next/server';
 
@@ -31,7 +31,7 @@ export async function POST() {
 
   try {
     // Cancela no Mercado Pago
-    await preApproval.update({
+    await getPreApproval().update({
       id: sub.mp_subscription_id,
       body: { status: 'cancelled' },
     });

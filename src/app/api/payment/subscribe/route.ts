@@ -1,4 +1,4 @@
-import { preApproval, PRO_PLAN } from '@/lib/mercadopago/client';
+import { getPreApproval, PRO_PLAN } from '@/lib/mercadopago/client';
 import { createClient } from '@/lib/supabase/server';
 import { NextResponse } from 'next/server';
 
@@ -36,7 +36,7 @@ export async function POST() {
   if (existingSub?.mp_subscription_id) {
     // Busca a URL de checkout existente no MP para evitar criar duplicatas
     try {
-      const existing = await preApproval.get({ id: existingSub.mp_subscription_id });
+      const existing = await getPreApproval().get({ id: existingSub.mp_subscription_id });
       if (existing?.init_point) {
         return NextResponse.json({ init_point: existing.init_point });
       }
@@ -48,7 +48,7 @@ export async function POST() {
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000';
 
   try {
-    const result = await preApproval.create({
+    const result = await getPreApproval().create({
       body: {
         reason: PRO_PLAN.label,
         payer_email: profile?.email ?? user.email!,

@@ -1,14 +1,15 @@
 import { MercadoPagoConfig, PreApproval } from 'mercadopago';
 
-if (!process.env.MP_ACCESS_TOKEN) {
-  throw new Error('MP_ACCESS_TOKEN não configurado no .env.local');
+function getMpClient() {
+  if (!process.env.MP_ACCESS_TOKEN) {
+    throw new Error('MP_ACCESS_TOKEN não configurado');
+  }
+  return new MercadoPagoConfig({ accessToken: process.env.MP_ACCESS_TOKEN });
 }
 
-export const mpClient = new MercadoPagoConfig({
-  accessToken: process.env.MP_ACCESS_TOKEN,
-});
-
-export const preApproval = new PreApproval(mpClient);
+export function getPreApproval() {
+  return new PreApproval(getMpClient());
+}
 
 /** Valor e moeda do plano PRO */
 export const PRO_PLAN = {
