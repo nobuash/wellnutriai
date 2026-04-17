@@ -12,6 +12,8 @@ const bodySchema = z.object({
   issuer_id: z.union([z.string(), z.number()]).optional(),
   payer: z.object({
     email: z.string().email(),
+    first_name: z.string().optional(),
+    last_name: z.string().optional(),
     identification: z.object({ type: z.string(), number: z.string() }).optional(),
   }),
   planInterval: z.enum(['monthly', 'quarterly', 'annual']).default('monthly'),
@@ -32,6 +34,17 @@ export async function POST(req: Request) {
   const plan = PLANS[planInterval as PlanInterval];
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000';
 
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('name, email')
+    .eq('id', user.id)
+    .single();
+
+  const fullName = profile?.name ?? 'Usuário WellNutri';
+  const nameParts = fullName.trim().split(' ');
+  const firstName = payer.first_name ?? nameParts[0] ?? 'Usuário';
+  const lastName = payer.last_name ?? (nameParts.length > 1 ? nameParts.slice(1).join(' ') : 'WellNutri');
+
   try {
     const result = await getPayment().create({
       body: {
@@ -43,19 +56,37 @@ export async function POST(req: Request) {
         issuer_id: issuer_id ? Number(issuer_id) : undefined,
         payer: {
           email: payer.email,
+          first_name: firstName,
+          last_name: lastName,
           identification: payer.identification,
         },
         external_reference: `${user.id}:${planInterval}`,
         notification_url: `${appUrl}/api/payment/webhook`,
         three_d_secure_mode: 'optional',
         binary_mode: false,
+        additional_info: {
+          items: [
+            {
+              id: `wellnutriai-pro-${planInterval}`,
+              title: plan.label,
+              description: `Acesso PRO WellNutriAI — ${plan.displayLabel}`,
+              quantity: 1,
+              unit_price: plan.amount,
+              category_id: 'services',
+            },
+          ],
+          payer: {
+            first_name: firstName,
+            last_name: lastName,
+            registration_date: new Date().toISOString(),
+          },
+        },
       },
     });
 
     if (!result?.id) throw new Error('Resposta inválida do Mercado Pago');
 
     const status = result.status;
-
     const statusDetail = result.status_detail ?? '';
     console.log(`[payment/card] status=${status} detail=${statusDetail} id=${result.id}`);
 
@@ -84,8 +115,8 @@ export async function POST(req: Request) {
       cc_rejected_bad_filled_date: 'Data de validade incorreta.',
       cc_rejected_bad_filled_other: 'Dados do cartão incorretos. Verifique e tente novamente.',
       cc_rejected_insufficient_amount: 'Saldo insuficiente no cartão.',
-      cc_rejected_high_risk: 'Pagamento recusado por segurança. Tente outro cartão ou use o PIX.',
-      cc_rejected_call_for_authorize: 'Ligue para o banco e autorize o pagamento, depois tente novamente.',
+      cc_rejected_high_risk: 'Pagamento recusado pelo banco. Tente novamente ou use o PIX.',
+      cc_rejected_call_for_authorize: 'Autorize o pagamento no app do seu banco e tente novamente.',
       cc_rejected_card_disabled: 'Cartão desativado para compras online. Contate seu banco.',
       cc_rejected_max_attempts: 'Muitas tentativas. Aguarde alguns minutos e tente novamente.',
       cc_rejected_duplicated_payment: 'Pagamento duplicado detectado.',
@@ -94,7 +125,6 @@ export async function POST(req: Request) {
     const userMessage = rejectionMessages[statusDetail]
       ?? (status !== 'approved' ? 'Pagamento não aprovado. Tente outro cartão ou use o PIX.' : null);
 
-    // 3DS: redireciona para autenticação do banco se necessário
     const resultAny = result as unknown as Record<string, unknown>;
     const threedsUrl = resultAny?.three_ds_info
       ? (resultAny.three_ds_info as Record<string, string>)?.external_resource_url
