@@ -67,7 +67,7 @@ export default function HydrationPage() {
   });
 
   const totalMl = logs.reduce((sum, l) => sum + l.amount_ml, 0);
-  const percent = Math.min(100, Math.round((totalMl / goalMl) * 100));
+  const percent = Math.round((totalMl / goalMl) * 100);
 
   const addMutation = useMutation({
     mutationFn: async (amount_ml: number) => {
@@ -89,6 +89,25 @@ export default function HydrationPage() {
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['water-logs', today] }),
     onError: () => toast.error('Erro ao remover registro'),
+  });
+
+  const resetMutation = useMutation({
+    mutationFn: async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Não autenticado');
+      const { error } = await supabase
+        .from('water_logs')
+        .delete()
+        .eq('user_id', user.id)
+        .gte('logged_at', `${today}T00:00:00`)
+        .lte('logged_at', `${today}T23:59:59`);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['water-logs', today] });
+      toast.success('Contagem zerada');
+    },
+    onError: () => toast.error('Erro ao zerar contagem'),
   });
 
   function handleAdd(ml: number) {
@@ -124,7 +143,18 @@ export default function HydrationPage() {
             <Droplets className="h-5 w-5 text-blue-500" />
             <span className="font-semibold text-slate-700">Hoje</span>
           </div>
-          <span className="text-sm text-slate-500">Meta: {formatMl(goalMl)}</span>
+          <div className="flex items-center gap-3">
+            <span className="text-sm text-slate-500">Meta: {formatMl(goalMl)}</span>
+            {logs.length > 0 && (
+              <button
+                onClick={() => resetMutation.mutate()}
+                disabled={resetMutation.isPending}
+                className="text-xs text-red-400 hover:text-red-600 transition-colors disabled:opacity-50"
+              >
+                Zerar
+              </button>
+            )}
+          </div>
         </div>
 
         {/* Valor total */}
@@ -137,7 +167,7 @@ export default function HydrationPage() {
         <div className="w-full bg-slate-100 rounded-full h-4 mb-6 overflow-hidden">
           <div
             className="h-4 rounded-full bg-gradient-to-r from-blue-400 to-blue-600 transition-all duration-500"
-            style={{ width: `${percent}%` }}
+            style={{ width: `${Math.min(100, percent)}%` }}
           />
         </div>
 
