@@ -24,41 +24,28 @@ export async function POST(req: Request) {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: 'Não autenticado' }, { status: 401 });
 
-  const { subscription_id } = await req.json().catch(() => ({})) as { subscription_id?: string };
-  if (!subscription_id) return NextResponse.json({ error: 'subscription_id obrigatório' }, { status: 400 });
+  const { session_id } = await req.json().catch(() => ({})) as { session_id?: string };
+  if (!session_id) return NextResponse.json({ error: 'session_id obrigatório' }, { status: 400 });
 
   try {
     const stripe = getStripe();
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const sub = await (stripe.subscriptions.retrieve as any)(subscription_id, {
-      expand: ['latest_invoice.payment_intent'],
-    });
+    const session = await stripe.checkout.sessions.retrieve(session_id);
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const meta = sub.metadata as any;
+    const meta = session.metadata as any;
     if (meta?.userId !== user.id) {
-      return NextResponse.json({ error: 'Assinatura não pertence a este usuário' }, { status: 403 });
+      return NextResponse.json({ error: 'Sessão não pertence a este usuário' }, { status: 403 });
     }
 
-    // Verifica se o pagamento da primeira fatura foi aprovado
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const paymentIntentStatus = (sub.latest_invoice as any)?.payment_intent?.status as string | undefined;
-    const subStatus = sub.status as string;
-
-    console.log(`[stripe/activate] sub=${subscription_id} status=${subStatus} pi_status=${paymentIntentStatus}`);
-
-    const paymentOk = subStatus === 'active'
-      || subStatus === 'trialing'
-      || paymentIntentStatus === 'succeeded';
-
-    if (!paymentOk) {
-      return NextResponse.json({ status: subStatus, activated: false });
+    if (session.status !== 'complete') {
+      return NextResponse.json({ status: session.status, activated: false });
     }
 
     const planInterval = (meta?.planInterval ?? 'monthly') as PlanInterval;
     const days = PLAN_DAYS[planInterval];
     const expiresAt = new Date();
     expiresAt.setDate(expiresAt.getDate() + days);
+    const subscriptionId = session.subscription as string ?? session_id;
 
     const db = getServiceSupabase();
 
@@ -66,7 +53,7 @@ export async function POST(req: Request) {
       {
         user_id: user.id,
         plan: 'pro',
-        mp_subscription_id: subscription_id,
+        mp_subscription_id: subscriptionId,
         mp_status: 'authorized',
         payment_type: 'card',
         expires_at: expiresAt.toISOString(),
@@ -84,8 +71,8 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Erro ao atualizar perfil' }, { status: 500 });
     }
 
-    console.log(`[stripe/activate] user=${user.id} ativado PRO sub=${subscription_id} expira=${expiresAt.toISOString()}`);
-    return NextResponse.json({ status: 'active', activated: true });
+    console.log(`[stripe/activate] user=${user.id} ativado PRO sub=${subscriptionId} expira=${expiresAt.toISOString()}`);
+    return NextResponse.json({ status: 'complete', activated: true });
   } catch (err) {
     console.error('[stripe/activate] error:', err);
     return NextResponse.json({ error: 'Erro ao ativar plano' }, { status: 500 });

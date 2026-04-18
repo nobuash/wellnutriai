@@ -9,7 +9,6 @@ async function getOrCreatePrice(planInterval: PlanInterval) {
   const stripe = getStripe();
   const config = STRIPE_INTERVALS[planInterval];
 
-  // Busca produto existente
   const products = await stripe.products.search({
     query: 'name:"WellNutriAI PRO" AND active:"true"',
     limit: 1,
@@ -17,7 +16,6 @@ async function getOrCreatePrice(planInterval: PlanInterval) {
   const product = products.data[0]
     ?? await stripe.products.create({ name: 'WellNutriAI PRO' });
 
-  // Busca preço existente para esse plano
   const prices = await stripe.prices.list({ product: product.id, active: true, limit: 20 });
   const existing = prices.data.find(
     (p) =>
@@ -45,6 +43,7 @@ export async function POST(req: Request) {
   if (!STRIPE_INTERVALS[planInterval]) return NextResponse.json({ error: 'Plano inválido' }, { status: 400 });
 
   const email = user.email ?? `${user.id}@wellnutriai.app`;
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://wellnutriai.com';
 
   try {
     const stripe = getStripe();
@@ -55,37 +54,21 @@ export async function POST(req: Request) {
 
     const price = await getOrCreatePrice(planInterval);
 
-    const subscription = await stripe.subscriptions.create({
+    const session = await stripe.checkout.sessions.create({
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      ui_mode: 'embedded' as any,
+      mode: 'subscription',
       customer: customer.id,
-      items: [{ price: price.id }],
-      payment_behavior: 'default_incomplete',
-      payment_settings: { save_default_payment_method: 'on_subscription' },
+      line_items: [{ price: price.id, quantity: 1 }],
+      return_url: `${appUrl}/pricing?stripe_session={CHECKOUT_SESSION_ID}`,
       metadata: { userId: user.id, planInterval },
+      subscription_data: { metadata: { userId: user.id, planInterval } },
     });
 
-    // Busca a invoice separadamente para garantir o expand do payment_intent
-    const invoiceId = subscription.latest_invoice as string;
-    if (!invoiceId) {
-      return NextResponse.json({ error: 'Invoice não encontrada' }, { status: 500 });
-    }
-
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const invoice = await (stripe.invoices.retrieve as any)(invoiceId, {
-      expand: ['payment_intent'],
-    }) as Record<string, any>;
-
-    const clientSecret = invoice?.payment_intent?.client_secret as string | null;
-
-    console.log('[stripe/intent] sub=', subscription.status, 'inv=', invoice?.status, 'pi=', invoice?.payment_intent?.status);
-
-    if (!clientSecret) {
-      return NextResponse.json({ error: 'Erro ao obter chave de pagamento' }, { status: 500 });
-    }
-
-    return NextResponse.json({ clientSecret, subscriptionId: subscription.id });
+    return NextResponse.json({ clientSecret: session.client_secret });
   } catch (err: unknown) {
-    const stripeErr = err as { type?: string; message?: string; code?: string };
+    const stripeErr = err as { message?: string; code?: string };
     console.error('[stripe/intent] error:', stripeErr?.message, stripeErr?.code);
-    return NextResponse.json({ error: stripeErr?.message ?? 'Erro ao criar assinatura' }, { status: 500 });
+    return NextResponse.json({ error: stripeErr?.message ?? 'Erro ao criar sessão de pagamento' }, { status: 500 });
   }
 }

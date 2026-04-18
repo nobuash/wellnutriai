@@ -30,9 +30,36 @@ function formatBRL(value: number) {
 
 export default function PricingPage() {
   const supabase = createClient();
+  const router = useRouter();
   const [pixData, setPixData] = useState<PixData | null>(null);
   const [selectedInterval, setSelectedInterval] = useState<PlanInterval>('annual');
   const [showCardModal, setShowCardModal] = useState(false);
+
+  // Ativa plano após retorno do Stripe Checkout
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const sessionId = params.get('stripe_session');
+    if (!sessionId) return;
+
+    // Remove o parâmetro da URL imediatamente
+    router.replace('/pricing', { scroll: false });
+
+    fetch('/api/payment/stripe/activate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ session_id: sessionId }),
+    })
+      .then((r) => r.json())
+      .then((d) => {
+        if (d.activated) {
+          toast.success('Pagamento aprovado! Seu plano PRO está ativo.');
+          window.location.reload();
+        } else {
+          toast.error('Pagamento processado, mas falha ao ativar. Contate o suporte.');
+        }
+      })
+      .catch(() => toast.error('Erro ao ativar plano. Contate o suporte.'));
+  }, [router]);
 
   const plan = PLANS[selectedInterval];
 
