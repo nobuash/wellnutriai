@@ -14,6 +14,8 @@
     "@hookform/resolvers": "^3.9.0",
     "@marsidev/react-turnstile": "^1.5.0",
     "@mercadopago/sdk-react": "^1.0.7",
+    "@stripe/react-stripe-js": "^6.2.0",
+    "@stripe/stripe-js": "^9.2.0",
     "@supabase/ssr": "^0.5.2",
     "@supabase/supabase-js": "^2.45.4",
     "@tanstack/react-query": "^5.56.2",
@@ -29,6 +31,7 @@
     "react-hook-form": "^7.53.0",
     "resend": "^6.12.0",
     "sonner": "^1.5.0",
+    "stripe": "^22.0.2",
     "tailwind-merge": "^2.5.2",
     "zod": "^3.23.8"
   },

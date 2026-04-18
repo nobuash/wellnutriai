@@ -2,13 +2,13 @@
 
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
-import { CardPaymentModal } from '@/components/CardPaymentModal';
+import { StripeCardModal } from '@/components/StripeCardModal';
 import { PLANS, type PlanInterval } from '@/lib/mercadopago/client';
 import { createClient } from '@/lib/supabase/client';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { AlertCircle, Check, Copy, CreditCard, QrCode, Sparkles, X } from 'lucide-react';
 import Image from 'next/image';
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 
@@ -120,7 +120,7 @@ export default function PricingPage() {
           </div>
 
           {/* Seletor de intervalo */}
-          {currentPlan !== 'pro' && (
+          {(
             <div className="flex rounded-lg border border-slate-200 p-1 mb-4 bg-slate-50">
               {(Object.keys(PLANS) as PlanInterval[]).map((interval) => (
                 <button
@@ -220,47 +220,16 @@ export default function PricingPage() {
 
       {/* Modal PIX */}
       {pixData && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl p-6 max-w-sm w-full space-y-4 shadow-xl">
-            <div className="flex items-center justify-between">
-              <h2 className="text-lg font-bold">Pague via PIX</h2>
-              <button onClick={() => setPixData(null)} className="text-slate-400 hover:text-slate-600">
-                <X className="h-5 w-5" />
-              </button>
-            </div>
-
-            <p className="text-sm text-slate-500 text-center">
-              Escaneie o QR code ou copie o código PIX. Após o pagamento, seu plano PRO será ativado automaticamente.
-            </p>
-
-            {pixData.qr_code_base64 && (
-              <div className="flex justify-center">
-                <Image
-                  src={`data:image/png;base64,${pixData.qr_code_base64}`}
-                  alt="QR Code PIX"
-                  width={200}
-                  height={200}
-                  className="rounded-lg border border-slate-200"
-                />
-              </div>
-            )}
-
-            <Button className="w-full" onClick={copyPix}>
-              <Copy className="h-4 w-4 mr-2" /> Copiar código PIX
-            </Button>
-
-            <VerifyPixButton paymentId={pixData.payment_id} onActivated={() => setPixData(null)} />
-
-            <p className="text-xs text-slate-400 text-center">
-              O QR code expira em 30 minutos.
-            </p>
-          </div>
-        </div>
+        <PixModal
+          pixData={pixData}
+          onClose={() => setPixData(null)}
+          onCopy={copyPix}
+        />
       )}
 
       {/* Modal Cartão */}
       {showCardModal && (
-        <CardPaymentModal
+        <StripeCardModal
           planInterval={selectedInterval}
           onClose={() => setShowCardModal(false)}
         />
@@ -269,38 +238,106 @@ export default function PricingPage() {
   );
 }
 
-function VerifyPixButton({ paymentId, onActivated }: { paymentId: number; onActivated: () => void }) {
+function PixModal({ pixData, onClose, onCopy }: {
+  pixData: PixData;
+  onClose: () => void;
+  onCopy: () => void;
+}) {
   const router = useRouter();
-  const [loading, setLoading] = useState(false);
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const [checking, setChecking] = useState(false);
 
-  async function verify() {
-    setLoading(true);
+  useEffect(() => {
+    // Verifica a cada 5 segundos automaticamente
+    intervalRef.current = setInterval(async () => {
+      try {
+        const res = await fetch('/api/payment/verify', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ payment_id: pixData.payment_id }),
+        });
+        const data = await res.json();
+        if (data.activated) {
+          clearInterval(intervalRef.current!);
+          toast.success('Pagamento confirmado! Plano PRO ativado.');
+          onClose();
+          router.refresh();
+        }
+      } catch { /* silencioso */ }
+    }, 5000);
+
+    // Para após 30 minutos (expiração do QR)
+    const timeout = setTimeout(() => clearInterval(intervalRef.current!), 30 * 60 * 1000);
+
+    return () => {
+      clearInterval(intervalRef.current!);
+      clearTimeout(timeout);
+    };
+  }, [pixData.payment_id, onClose, router]);
+
+  async function verifyNow() {
+    setChecking(true);
     try {
       const res = await fetch('/api/payment/verify', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ payment_id: paymentId }),
+        body: JSON.stringify({ payment_id: pixData.payment_id }),
       });
       const data = await res.json();
       if (data.activated) {
-        toast.success('Plano PRO ativado com sucesso!');
-        onActivated();
+        clearInterval(intervalRef.current!);
+        toast.success('Pagamento confirmado! Plano PRO ativado.');
+        onClose();
         router.refresh();
-      } else if (data.status && data.status !== 'approved') {
-        toast.info('Pagamento ainda não confirmado. Aguarde alguns segundos e tente novamente.');
       } else {
-        toast.error(data.error ?? 'Não foi possível verificar o pagamento.');
+        toast.info('Pagamento ainda não confirmado. Aguardando...');
       }
     } catch {
-      toast.error('Erro de conexão. Tente novamente.');
+      toast.error('Erro ao verificar. Tente novamente.');
     } finally {
-      setLoading(false);
+      setChecking(false);
     }
   }
 
   return (
-    <Button variant="outline" className="w-full" onClick={verify} loading={loading}>
-      Já paguei — verificar agora
-    </Button>
+    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+      <div className="bg-white rounded-2xl p-6 max-w-sm w-full space-y-4 shadow-xl">
+        <div className="flex items-center justify-between">
+          <h2 className="text-lg font-bold">Pague via PIX</h2>
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-600">
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+
+        <p className="text-sm text-slate-500 text-center">
+          Escaneie o QR code ou copie o código. O plano será ativado automaticamente após o pagamento.
+        </p>
+
+        {pixData.qr_code_base64 && (
+          <div className="flex justify-center">
+            <Image
+              src={`data:image/png;base64,${pixData.qr_code_base64}`}
+              alt="QR Code PIX"
+              width={200}
+              height={200}
+              className="rounded-lg border border-slate-200"
+            />
+          </div>
+        )}
+
+        <Button className="w-full" onClick={onCopy}>
+          <Copy className="h-4 w-4 mr-2" /> Copiar código PIX
+        </Button>
+
+        <Button variant="outline" className="w-full" loading={checking} onClick={verifyNow}>
+          Já paguei — verificar agora
+        </Button>
+
+        <div className="flex items-center gap-2 justify-center">
+          <span className="h-2 w-2 rounded-full bg-green-400 animate-pulse" />
+          <p className="text-xs text-slate-400">Verificando pagamento automaticamente...</p>
+        </div>
+      </div>
+    </div>
   );
 }
