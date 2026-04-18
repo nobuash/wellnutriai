@@ -1,5 +1,5 @@
 import { getStripe } from '@/lib/stripe/client';
-import { PLANS, type PlanInterval } from '@/lib/mercadopago/client';
+import { type PlanInterval } from '@/lib/mercadopago/client';
 import { createClient } from '@/lib/supabase/server';
 import { createClient as createServiceClient } from '@supabase/supabase-js';
 import { NextResponse } from 'next/server';
@@ -13,40 +13,46 @@ function getServiceSupabase() {
   );
 }
 
+const PLAN_DAYS: Record<PlanInterval, number> = {
+  monthly: 30,
+  quarterly: 90,
+  annual: 365,
+};
+
 export async function POST(req: Request) {
-  // Auth check via cookie client
   const supabase = createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: 'Não autenticado' }, { status: 401 });
 
-  const { payment_intent_id } = await req.json().catch(() => ({})) as { payment_intent_id?: string };
-  if (!payment_intent_id) return NextResponse.json({ error: 'payment_intent_id obrigatório' }, { status: 400 });
+  const { subscription_id } = await req.json().catch(() => ({})) as { subscription_id?: string };
+  if (!subscription_id) return NextResponse.json({ error: 'subscription_id obrigatório' }, { status: 400 });
 
   try {
     const stripe = getStripe();
-    const intent = await stripe.paymentIntents.retrieve(payment_intent_id);
+    const sub = await stripe.subscriptions.retrieve(subscription_id);
 
-    if (intent.metadata?.userId !== user.id) {
-      return NextResponse.json({ error: 'Pagamento não pertence a este usuário' }, { status: 403 });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const meta = sub.metadata as any;
+    if (meta?.userId !== user.id) {
+      return NextResponse.json({ error: 'Assinatura não pertence a este usuário' }, { status: 403 });
     }
 
-    if (intent.status !== 'succeeded') {
-      return NextResponse.json({ status: intent.status, activated: false });
+    if (sub.status !== 'active' && sub.status !== 'trialing') {
+      return NextResponse.json({ status: sub.status, activated: false });
     }
 
-    const planInterval = (intent.metadata?.planInterval ?? 'monthly') as PlanInterval;
-    const plan = PLANS[planInterval];
+    const planInterval = (meta?.planInterval ?? 'monthly') as PlanInterval;
+    const days = PLAN_DAYS[planInterval];
     const expiresAt = new Date();
-    expiresAt.setDate(expiresAt.getDate() + plan.durationDays);
+    expiresAt.setDate(expiresAt.getDate() + days);
 
-    // Use service role to bypass RLS
     const db = getServiceSupabase();
 
     const { error: subError } = await db.from('subscriptions').upsert(
       {
         user_id: user.id,
         plan: 'pro',
-        mp_subscription_id: payment_intent_id,
+        mp_subscription_id: subscription_id,
         mp_status: 'authorized',
         payment_type: 'card',
         expires_at: expiresAt.toISOString(),
@@ -64,8 +70,8 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Erro ao atualizar perfil' }, { status: 500 });
     }
 
-    console.log(`[stripe/activate] user=${user.id} ativado PRO via Stripe, expira ${expiresAt.toISOString()}`);
-    return NextResponse.json({ status: 'succeeded', activated: true });
+    console.log(`[stripe/activate] user=${user.id} ativado PRO via Stripe sub=${subscription_id}, expira ${expiresAt.toISOString()}`);
+    return NextResponse.json({ status: 'active', activated: true });
   } catch (err) {
     console.error('[stripe/activate] error:', err);
     return NextResponse.json({ error: 'Erro ao ativar plano' }, { status: 500 });

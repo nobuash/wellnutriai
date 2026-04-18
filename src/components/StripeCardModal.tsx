@@ -24,6 +24,7 @@ interface Props {
 export function StripeCardModal({ planInterval, onClose }: Props) {
   const plan = PLANS[planInterval];
   const [clientSecret, setClientSecret] = useState<string | null>(null);
+  const [subscriptionId, setSubscriptionId] = useState<string | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -34,8 +35,12 @@ export function StripeCardModal({ planInterval, onClose }: Props) {
     })
       .then((r) => r.json())
       .then((d) => {
-        if (d.clientSecret) setClientSecret(d.clientSecret);
-        else setLoadError(d.error ?? 'Erro ao iniciar pagamento');
+        if (d.clientSecret) {
+          setClientSecret(d.clientSecret);
+          setSubscriptionId(d.subscriptionId);
+        } else {
+          setLoadError(d.error ?? 'Erro ao iniciar pagamento');
+        }
       })
       .catch(() => setLoadError('Erro de conexão'));
   }, [planInterval]);
@@ -48,6 +53,7 @@ export function StripeCardModal({ planInterval, onClose }: Props) {
             <h2 className="text-lg font-bold">Pagamento via Cartão</h2>
             <p className="text-sm text-slate-500">
               {plan.displayLabel} · R$ {plan.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+              {' · Renovação automática'}
             </p>
           </div>
           <button onClick={onClose} className="text-slate-400 hover:text-slate-600 p-1">
@@ -65,12 +71,12 @@ export function StripeCardModal({ planInterval, onClose }: Props) {
           </div>
         )}
 
-        {clientSecret && (
+        {clientSecret && subscriptionId && (
           <Elements
             stripe={stripePromise}
             options={{ clientSecret, locale: 'pt-BR', appearance: { theme: 'stripe' } }}
           >
-            <CheckoutForm planInterval={planInterval} onClose={onClose} />
+            <CheckoutForm subscriptionId={subscriptionId} onClose={onClose} />
           </Elements>
         )}
       </div>
@@ -78,7 +84,7 @@ export function StripeCardModal({ planInterval, onClose }: Props) {
   );
 }
 
-function CheckoutForm({ onClose }: { planInterval: PlanInterval; onClose: () => void }) {
+function CheckoutForm({ subscriptionId, onClose }: { subscriptionId: string; onClose: () => void }) {
   const stripe = useStripe();
   const elements = useElements();
   const router = useRouter();
@@ -90,7 +96,7 @@ function CheckoutForm({ onClose }: { planInterval: PlanInterval; onClose: () => 
 
     setLoading(true);
     try {
-      const { error, paymentIntent } = await stripe.confirmPayment({
+      const { error } = await stripe.confirmPayment({
         elements,
         confirmParams: { return_url: `${window.location.origin}/pricing` },
         redirect: 'if_required',
@@ -101,25 +107,21 @@ function CheckoutForm({ onClose }: { planInterval: PlanInterval; onClose: () => 
         return;
       }
 
-      if (paymentIntent?.status === 'succeeded') {
-        const res = await fetch('/api/payment/stripe/activate', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ payment_intent_id: paymentIntent.id }),
-        });
-        const data = await res.json();
-        if (data.activated) {
-          toast.success('Pagamento aprovado! Seu plano PRO está ativo.');
-          onClose();
-          router.refresh();
-          // Força reload completo para garantir que o plano seja atualizado
-          window.location.reload();
-        } else {
-          toast.error('Pagamento processado, mas falha ao ativar plano. Contate o suporte.');
-        }
-      } else {
-        toast.info('Pagamento em processamento. Você receberá confirmação em breve.');
+      // Ativa o plano via subscription ID
+      const res = await fetch('/api/payment/stripe/activate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ subscription_id: subscriptionId }),
+      });
+      const data = await res.json();
+
+      if (data.activated) {
+        toast.success('Pagamento aprovado! Seu plano PRO está ativo.');
         onClose();
+        router.refresh();
+        window.location.reload();
+      } else {
+        toast.error('Pagamento processado, mas falha ao ativar plano. Contate o suporte.');
       }
     } finally {
       setLoading(false);
