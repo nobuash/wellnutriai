@@ -116,11 +116,6 @@ export default async function DashboardPage() {
         </Card>
       </div>
 
-      {/* Hidratação diária */}
-      <Card>
-        <HydrationWidget goalMl={content?.daily_water_ml ?? 2000} />
-      </Card>
-
       {/* Plano alimentar atual */}
       <Card>
         <div className="flex items-center justify-between mb-4">
@@ -171,6 +166,11 @@ export default async function DashboardPage() {
           locked={!isPro}
         />
       </div>
+
+      {/* Hidratação diária */}
+      <Card>
+        <HydrationWidget goalMl={content?.daily_water_ml ?? 2000} />
+      </Card>
     </div>
   );
 }
