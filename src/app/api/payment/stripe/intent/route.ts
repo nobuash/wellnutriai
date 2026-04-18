@@ -60,19 +60,26 @@ export async function POST(req: Request) {
       items: [{ price: price.id }],
       payment_behavior: 'default_incomplete',
       payment_settings: { save_default_payment_method: 'on_subscription' },
-      expand: ['latest_invoice.payment_intent'],
       metadata: { userId: user.id, planInterval },
     });
 
+    // Busca a invoice separadamente para garantir o expand do payment_intent
+    const invoiceId = subscription.latest_invoice as string;
+    if (!invoiceId) {
+      return NextResponse.json({ error: 'Invoice não encontrada' }, { status: 500 });
+    }
+
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const invoice = subscription.latest_invoice as any;
-    console.log('[stripe/intent] sub.status=', subscription.status, 'invoice=', typeof invoice, 'invoice.status=', invoice?.status, 'pi=', typeof invoice?.payment_intent, 'pi.status=', invoice?.payment_intent?.status);
+    const invoice = await (stripe.invoices.retrieve as any)(invoiceId, {
+      expand: ['payment_intent'],
+    }) as Record<string, any>;
 
     const clientSecret = invoice?.payment_intent?.client_secret as string | null;
 
+    console.log('[stripe/intent] sub=', subscription.status, 'inv=', invoice?.status, 'pi=', invoice?.payment_intent?.status);
+
     if (!clientSecret) {
-      console.error('[stripe/intent] clientSecret ausente. sub.status=', subscription.status, 'invoice.status=', invoice?.status, 'pi.status=', invoice?.payment_intent?.status);
-      return NextResponse.json({ error: `Erro ao obter chave (sub=${subscription.status} inv=${invoice?.status} pi=${invoice?.payment_intent?.status ?? 'null'})` }, { status: 500 });
+      return NextResponse.json({ error: 'Erro ao obter chave de pagamento' }, { status: 500 });
     }
 
     return NextResponse.json({ clientSecret, subscriptionId: subscription.id });
