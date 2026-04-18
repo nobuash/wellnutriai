@@ -39,7 +39,8 @@ export function StripeCardModal({ planInterval, onClose }: Props) {
           setClientSecret(d.clientSecret);
           setSubscriptionId(d.subscriptionId);
         } else {
-          setLoadError(d.error ?? 'Erro ao iniciar pagamento');
+          setLoadError(d.error ?? 'Erro ao iniciar pagamento. Verifique o console.');
+          console.error('[StripeCardModal] intent error:', d);
         }
       })
       .catch(() => setLoadError('Erro de conexão'));
