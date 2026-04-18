@@ -29,7 +29,10 @@ export async function POST(req: Request) {
 
   try {
     const stripe = getStripe();
-    const sub = await stripe.subscriptions.retrieve(subscription_id);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const sub = await (stripe.subscriptions.retrieve as any)(subscription_id, {
+      expand: ['latest_invoice.payment_intent'],
+    });
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const meta = sub.metadata as any;
@@ -37,8 +40,19 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Assinatura não pertence a este usuário' }, { status: 403 });
     }
 
-    if (sub.status !== 'active' && sub.status !== 'trialing') {
-      return NextResponse.json({ status: sub.status, activated: false });
+    // Verifica se o pagamento da primeira fatura foi aprovado
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const paymentIntentStatus = (sub.latest_invoice as any)?.payment_intent?.status as string | undefined;
+    const subStatus = sub.status as string;
+
+    console.log(`[stripe/activate] sub=${subscription_id} status=${subStatus} pi_status=${paymentIntentStatus}`);
+
+    const paymentOk = subStatus === 'active'
+      || subStatus === 'trialing'
+      || paymentIntentStatus === 'succeeded';
+
+    if (!paymentOk) {
+      return NextResponse.json({ status: subStatus, activated: false });
     }
 
     const planInterval = (meta?.planInterval ?? 'monthly') as PlanInterval;
@@ -70,7 +84,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Erro ao atualizar perfil' }, { status: 500 });
     }
 
-    console.log(`[stripe/activate] user=${user.id} ativado PRO via Stripe sub=${subscription_id}, expira ${expiresAt.toISOString()}`);
+    console.log(`[stripe/activate] user=${user.id} ativado PRO sub=${subscription_id} expira=${expiresAt.toISOString()}`);
     return NextResponse.json({ status: 'active', activated: true });
   } catch (err) {
     console.error('[stripe/activate] error:', err);
