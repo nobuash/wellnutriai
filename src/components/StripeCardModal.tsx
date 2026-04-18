@@ -78,7 +78,7 @@ export function StripeCardModal({ planInterval, onClose }: Props) {
   );
 }
 
-function CheckoutForm({ planInterval, onClose }: { planInterval: PlanInterval; onClose: () => void }) {
+function CheckoutForm({ onClose }: { planInterval: PlanInterval; onClose: () => void }) {
   const stripe = useStripe();
   const elements = useElements();
   const router = useRouter();
@@ -112,6 +112,8 @@ function CheckoutForm({ planInterval, onClose }: { planInterval: PlanInterval; o
           toast.success('Pagamento aprovado! Seu plano PRO está ativo.');
           onClose();
           router.refresh();
+          // Força reload completo para garantir que o plano seja atualizado
+          window.location.reload();
         } else {
           toast.error('Pagamento processado, mas falha ao ativar plano. Contate o suporte.');
         }
