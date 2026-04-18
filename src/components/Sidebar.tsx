@@ -3,7 +3,7 @@
 import { cn } from '@/lib/utils';
 import { createClient } from '@/lib/supabase/client';
 import {
-  Camera, ClipboardList, Droplets, HeadphonesIcon, LayoutDashboard, LogOut,
+  Camera, ClipboardList, HeadphonesIcon, LayoutDashboard, LogOut,
   MessageCircle, Sparkles, Utensils, X,
 } from 'lucide-react';
 import Image from 'next/image';
@@ -15,7 +15,6 @@ const nav = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/questionnaire', label: 'Questionário', icon: ClipboardList },
   { href: '/meal-plan', label: 'Plano Alimentar', icon: Utensils },
-  { href: '/hydration', label: 'Hidratação', icon: Droplets },
   { href: '/chat', label: 'Chat IA', icon: MessageCircle, pro: true },
   { href: '/photo-analysis', label: 'Análise por Foto', icon: Camera, pro: true },
   { href: '/support', label: 'Suporte', icon: HeadphonesIcon },

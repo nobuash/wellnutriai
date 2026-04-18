@@ -1,7 +1,8 @@
 import { Card } from '@/components/ui/Card';
+import { HydrationWidget } from '@/components/HydrationWidget';
 import { createClient } from '@/lib/supabase/server';
 import { formatDate } from '@/lib/utils';
-import { Camera, ClipboardList, Droplets, Lock, MessageCircle, Sparkles, Utensils } from 'lucide-react';
+import { Camera, ClipboardList, Lock, MessageCircle, Sparkles, Utensils } from 'lucide-react';
 import Link from 'next/link';
 import type { MealPlan, MealPlanContent, NutritionQuestionnaire } from '@/types/database';
 
@@ -14,14 +15,6 @@ const goalLabels = {
   maintain: 'Manutenção do peso',
 };
 
-function calcWaterLiters(age: number, weightKg: number): number {
-  let mlPerKg: number;
-  if (age <= 17) mlPerKg = 40;
-  else if (age <= 55) mlPerKg = 35;
-  else if (age <= 65) mlPerKg = 30;
-  else mlPerKg = 25;
-  return Math.round((mlPerKg * weightKg) / 100) / 10; // arredonda p/ 1 casa decimal
-}
 
 export default async function DashboardPage() {
   const supabase = createClient();
@@ -65,9 +58,6 @@ export default async function DashboardPage() {
   })();
 
   const isRecurring = subscription?.payment_type === 'subscription';
-  const waterLiters = questionnaire
-    ? calcWaterLiters(questionnaire.age, questionnaire.weight)
-    : null;
 
   return (
     <div className="space-y-6">
@@ -127,25 +117,9 @@ export default async function DashboardPage() {
       </div>
 
       {/* Hidratação diária */}
-      {waterLiters && (
-        <Card className="bg-blue-50 border-blue-200">
-          <div className="flex items-center gap-3">
-            <div className="h-10 w-10 rounded-lg bg-blue-100 text-blue-600 flex items-center justify-center shrink-0">
-              <Droplets className="h-5 w-5" />
-            </div>
-            <div>
-              <p className="text-xs text-blue-600 font-medium uppercase">Hidratação mínima recomendada</p>
-              <p className="text-2xl font-bold text-blue-700">
-                {waterLiters} L
-                <span className="text-sm font-normal text-blue-500 ml-2">de água por dia</span>
-              </p>
-              <p className="text-xs text-blue-500 mt-0.5">
-                Baseado no seu peso ({questionnaire?.weight} kg) e idade ({questionnaire?.age} anos)
-              </p>
-            </div>
-          </div>
-        </Card>
-      )}
+      <Card>
+        <HydrationWidget goalMl={content?.daily_water_ml ?? 2000} />
+      </Card>
 
       {/* Plano alimentar atual */}
       <Card>
