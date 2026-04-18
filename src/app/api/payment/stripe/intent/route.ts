@@ -65,11 +65,14 @@ export async function POST(req: Request) {
     });
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const clientSecret = (subscription.latest_invoice as any)?.payment_intent?.client_secret as string | null;
+    const invoice = subscription.latest_invoice as any;
+    console.log('[stripe/intent] sub.status=', subscription.status, 'invoice=', typeof invoice, 'invoice.status=', invoice?.status, 'pi=', typeof invoice?.payment_intent, 'pi.status=', invoice?.payment_intent?.status);
+
+    const clientSecret = invoice?.payment_intent?.client_secret as string | null;
 
     if (!clientSecret) {
-      console.error('[stripe/intent] clientSecret ausente');
-      return NextResponse.json({ error: 'Erro ao obter chave de pagamento' }, { status: 500 });
+      console.error('[stripe/intent] clientSecret ausente. sub.status=', subscription.status, 'invoice.status=', invoice?.status, 'pi.status=', invoice?.payment_intent?.status);
+      return NextResponse.json({ error: `Erro ao obter chave (sub=${subscription.status} inv=${invoice?.status} pi=${invoice?.payment_intent?.status ?? 'null'})` }, { status: 500 });
     }
 
     return NextResponse.json({ clientSecret, subscriptionId: subscription.id });
