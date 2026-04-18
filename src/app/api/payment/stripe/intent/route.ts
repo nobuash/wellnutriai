@@ -56,7 +56,7 @@ export async function POST(req: Request) {
 
     const session = await stripe.checkout.sessions.create({
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      ui_mode: 'embedded' as any,
+      ui_mode: 'embedded_page' as any,
       mode: 'subscription',
       customer: customer.id,
       line_items: [{ price: price.id, quantity: 1 }],
