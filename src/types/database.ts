@@ -1,6 +1,7 @@
 export type Plan = 'free' | 'pro';
 export type Goal = 'gain_muscle' | 'lose_fat' | 'maintain';
 export type ActivityLevel = 'sedentary' | 'light' | 'moderate' | 'intense' | 'athlete';
+export type DiabetesType = 'none' | 'type1' | 'type2' | 'pre_diabetes';
 
 export interface Profile {
   id: string;
@@ -21,6 +22,7 @@ export interface NutritionQuestionnaire {
   body_fat: number | null;
   goal: Goal;
   activity_level: ActivityLevel;
+  diabetes_type: DiabetesType;
   allergies: string[];
   dietary_preferences: string[];
   disliked_foods: string[];

@@ -24,6 +24,13 @@ const ACTIVITY = [
   { value: 'athlete', label: 'Atleta' },
 ] as const;
 
+const DIABETES_OPTIONS = [
+  { value: 'none', label: 'Não sou diabético', description: null },
+  { value: 'pre_diabetes', label: 'Pré-diabetes', description: 'Glicemia levemente elevada' },
+  { value: 'type2', label: 'Diabetes tipo 2', description: 'Resistência à insulina' },
+  { value: 'type1', label: 'Diabetes tipo 1', description: 'Dependente de insulina' },
+] as const;
+
 function TagsInput({ value, onChange, placeholder }: {
   value: string[]; onChange: (v: string[]) => void; placeholder?: string;
 }) {
@@ -69,7 +76,7 @@ export default function QuestionnairePage() {
   } = useForm<QuestionnaireInput>({
     resolver: zodResolver(questionnaireSchema),
     defaultValues: {
-      allergies: [], dietary_preferences: [], disliked_foods: [], meals_per_day: 4,
+      allergies: [], dietary_preferences: [], disliked_foods: [], meals_per_day: 4, diabetes_type: 'none',
     },
   });
 
@@ -138,6 +145,22 @@ export default function QuestionnairePage() {
             ))}
           </div>
           {errors.activity_level && <p className="text-xs text-red-600 mt-1">Selecione um nível</p>}
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-slate-700 mb-2">Você tem diabetes?</label>
+          <div className="grid grid-cols-2 gap-2">
+            {DIABETES_OPTIONS.map((d) => (
+              <label key={d.value} className="cursor-pointer">
+                <input type="radio" value={d.value} {...register('diabetes_type')} className="peer sr-only" />
+                <div className="rounded-lg border border-slate-300 p-3 text-sm peer-checked:border-brand-600 peer-checked:bg-brand-50 peer-checked:text-brand-700 peer-checked:font-medium">
+                  <span className="font-medium">{d.label}</span>
+                  {d.description && <p className="text-xs text-slate-400 mt-0.5">{d.description}</p>}
+                </div>
+              </label>
+            ))}
+          </div>
+          {errors.diabetes_type && <p className="text-xs text-red-600 mt-1">Selecione uma opção</p>}
         </div>
 
         <div>

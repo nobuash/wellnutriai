@@ -29,6 +29,7 @@ export const questionnaireSchema = z.object({
   ),
   goal: z.enum(['gain_muscle', 'lose_fat', 'maintain']),
   activity_level: z.enum(['sedentary', 'light', 'moderate', 'intense', 'athlete']),
+  diabetes_type: z.enum(['none', 'type1', 'type2', 'pre_diabetes']),
   allergies: z.array(z.string()).default([]),
   dietary_preferences: z.array(z.string()).default([]),
   disliked_foods: z.array(z.string()).default([]),

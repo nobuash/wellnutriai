@@ -14,6 +14,22 @@ export const LEGAL_DISCLAIMER =
   'Não substitui o acompanhamento de um nutricionista, médico ou profissional de saúde qualificado. ' +
   'Em caso de condições médicas, alergias severas ou necessidades específicas, procure um profissional.';
 
+const diabetesMap: Record<string, string> = {
+  none: 'não diabético',
+  pre_diabetes: 'pré-diabetes (glicemia levemente elevada)',
+  type2: 'diabetes tipo 2 (resistência à insulina)',
+  type1: 'diabetes tipo 1 (dependente de insulina)',
+};
+
+const diabetesGuidelines: Record<string, string> = {
+  pre_diabetes:
+    'O usuário tem PRÉ-DIABETES. Priorize alimentos de baixo índice glicêmico (IG), reduza açúcares simples e carboidratos refinados, aumente fibras solúveis (aveia, leguminosas, vegetais), distribua os carboidratos igualmente entre as refeições para evitar picos glicêmicos.',
+  type2:
+    'O usuário tem DIABETES TIPO 2. É OBRIGATÓRIO: (1) usar APENAS alimentos de baixo/médio IG; (2) ELIMINAR açúcar, mel, doces, sucos de fruta, pão branco, arroz branco e farinhas refinadas do plano; (3) priorizar carboidratos integrais, leguminosas e vegetais ricos em fibras; (4) distribuir carboidratos uniformemente entre as refeições (nunca concentrar em uma só refeição); (5) incluir sempre proteína ou gordura boa junto aos carboidratos para reduzir o IG da refeição; (6) incluir na seção "observations" orientação para monitorar glicemia e consultar endocrinologista/nutricionista especializado.',
+  type1:
+    'O usuário tem DIABETES TIPO 1 (insulinodependente). É OBRIGATÓRIO: (1) calcular e informar a quantidade exata de carboidratos (em gramas) em cada refeição para facilitar o cálculo de insulina; (2) usar APENAS alimentos de baixo/médio IG; (3) ELIMINAR açúcar, doces, sucos e carboidratos de absorção rápida; (4) manter consistência no total de carboidratos dia a dia; (5) incluir na seção "observations" alerta de que o ajuste de doses de insulina deve ser feito exclusivamente com médico endocrinologista.',
+};
+
 export function buildMealPlanPrompt(q: NutritionQuestionnaire, knowledgeContext = ''): string {
   const goalMap = {
     gain_muscle: 'ganho de massa muscular',
@@ -43,15 +59,21 @@ export function buildMealPlanPrompt(q: NutritionQuestionnaire, knowledgeContext 
     ? `✅ PREFERÊNCIAS ALIMENTARES (o plano DEVE priorizar e incluir esses alimentos/estilos): ${q.dietary_preferences.join(', ')}`
     : null;
 
+  const diabetesType = q.diabetes_type ?? 'none';
+  const diabetesBlock = diabetesType !== 'none'
+    ? `🩺 CONDIÇÃO MÉDICA — ${diabetesGuidelines[diabetesType]}`
+    : null;
+
   return `Você é um assistente nutricional educacional baseado em IA. Sua função é SUGERIR um plano alimentar informativo (nunca prescrever).
 
-${prohibitionsSection ? `⚠️ PROIBIÇÕES ABSOLUTAS — NUNCA inclua esses itens:\n${prohibitionsSection}\n\n` : ''}${preferencesBlock ? `${preferencesBlock}\n\n` : ''}${knowledgeContext ? `${knowledgeContext}\n\n` : ''}DADOS DO USUÁRIO:
+${diabetesBlock ? `${diabetesBlock}\n\n` : ''}${prohibitionsSection ? `⚠️ PROIBIÇÕES ABSOLUTAS — NUNCA inclua esses itens:\n${prohibitionsSection}\n\n` : ''}${preferencesBlock ? `${preferencesBlock}\n\n` : ''}${knowledgeContext ? `${knowledgeContext}\n\n` : ''}DADOS DO USUÁRIO:
 - Idade: ${q.age} anos
 - Peso: ${q.weight} kg
 - Altura: ${q.height} cm
 ${q.body_fat ? `- Gordura corporal: ${q.body_fat}%` : ''}
 - Objetivo: ${goalMap[q.goal]}
 - Nível de atividade: ${activityMap[q.activity_level]}
+- Condição: ${diabetesMap[diabetesType]}
 - Refeições por dia: ${q.meals_per_day}
 ${q.routine ? `- Rotina: ${q.routine}` : ''}
 
@@ -59,7 +81,7 @@ INSTRUÇÕES:
 1. Calcule calorias sugeridas com base na fórmula Mifflin-St Jeor e fator de atividade.
 2. Ajuste conforme o objetivo (déficit ~15-20% para perda, superávit ~10% para ganho).
 3. Distribua em ${q.meals_per_day} refeições com horários sugeridos.
-4. Respeite ABSOLUTAMENTE as proibições acima e priorize as preferências indicadas.
+4. Respeite ABSOLUTAMENTE as proibições acima, as diretrizes da condição médica e priorize as preferências indicadas.
 5. Calcule a ingestão diária de água recomendada (em ml) com base no peso e nível de atividade (base: 35ml/kg, +500ml se atividade intensa ou atleta).
 6. Use linguagem de SUGESTÃO, nunca prescrição.
 
@@ -102,6 +124,7 @@ REGRAS INEGOCIÁVEIS:
 ${q ? `CONTEXTO DO USUÁRIO:
 - Idade ${q.age}, peso ${q.weight}kg, altura ${q.height}cm
 - Objetivo: ${q.goal}
+- Condição: ${diabetesMap[q.diabetes_type ?? 'none']}
 - Alergias: ${q.allergies.join(', ') || 'nenhuma'}
 - Preferências: ${q.dietary_preferences.join(', ') || 'nenhuma'}
 - Alimentos evitados: ${q.disliked_foods.join(', ') || 'nenhum'}` : ''}
