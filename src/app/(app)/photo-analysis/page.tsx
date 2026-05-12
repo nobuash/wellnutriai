@@ -4,11 +4,12 @@ import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { Disclaimer } from '@/components/ui/Disclaimer';
 import { Input } from '@/components/ui/Input';
+import { addCalorieLog } from '@/components/CalorieWidget';
 import { createClient } from '@/lib/supabase/client';
 import { formatDate } from '@/lib/utils';
 import type { MealPhotoAnalysis, PhotoAnalysisResult } from '@/types/database';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Camera, Plus, Sparkles, Trash2, Upload } from 'lucide-react';
+import { Camera, Flame, Plus, Sparkles, Trash2, Upload } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useRef, useState } from 'react';
 import { toast } from 'sonner';
@@ -34,6 +35,8 @@ export default function PhotoAnalysisPage() {
   const [preview, setPreview] = useState<string | null>(null);
   const [file, setFile] = useState<File | null>(null);
   const [manualFoods, setManualFoods] = useState<ManualFood[]>([{ name: '', grams: '' }]);
+  const [addedToCalories, setAddedToCalories] = useState(false);
+  const today = new Date().toISOString().split('T')[0];
 
   const { data: history = [] } = useQuery({
     queryKey: ['photo-history'],
@@ -67,6 +70,7 @@ export default function PhotoAnalysisPage() {
     onSuccess: () => {
       toast.success('Análise concluída!');
       qc.invalidateQueries({ queryKey: ['photo-history'] });
+      setAddedToCalories(false);
       setFile(null);
       setPreview(null);
       if (fileRef.current) fileRef.current.value = '';
@@ -98,7 +102,26 @@ export default function PhotoAnalysisPage() {
     onSuccess: () => {
       toast.success('Análise concluída!');
       qc.invalidateQueries({ queryKey: ['photo-history'] });
+      setAddedToCalories(false);
     },
+  });
+
+  // Adicionar resultado à meta de calorias diária
+  const addCalorieMutation = useMutation({
+    mutationFn: async () => {
+      if (!result) throw new Error('Sem resultado');
+      const description = result.foods
+        .map((f) => f.name)
+        .join(', ')
+        .slice(0, 120);
+      await addCalorieLog(supabase, result.total_calories_estimate, description);
+    },
+    onSuccess: () => {
+      setAddedToCalories(true);
+      qc.invalidateQueries({ queryKey: ['calorie-logs', today] });
+      toast.success('Refeição adicionada à meta de calorias!');
+    },
+    onError: () => toast.error('Erro ao adicionar calorias'),
   });
 
   function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
@@ -288,6 +311,23 @@ export default function PhotoAnalysisPage() {
 
             {result.notes && <p className="text-sm text-slate-600">{result.notes}</p>}
             <Disclaimer variant="warning">{result.disclaimer}</Disclaimer>
+
+            <button
+              onClick={() => addCalorieMutation.mutate()}
+              disabled={addedToCalories || addCalorieMutation.isPending}
+              className={`w-full flex items-center justify-center gap-2 rounded-xl py-3 px-4 text-sm font-semibold transition-all ${
+                addedToCalories
+                  ? 'bg-red-50 text-red-400 cursor-default border border-red-100'
+                  : 'bg-red-500 hover:bg-red-600 active:scale-[0.98] text-white shadow-sm disabled:opacity-60'
+              }`}
+            >
+              <Flame className="h-4 w-4" />
+              {addedToCalories
+                ? 'Adicionado à meta de calorias ✓'
+                : addCalorieMutation.isPending
+                  ? 'Adicionando...'
+                  : 'Adicionar refeição na meta de calorias'}
+            </button>
           </div>
         </Card>
       )}

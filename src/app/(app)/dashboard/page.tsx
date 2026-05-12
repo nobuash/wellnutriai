@@ -1,4 +1,5 @@
 import { Card } from '@/components/ui/Card';
+import { CalorieWidget } from '@/components/CalorieWidget';
 import { HydrationWidget } from '@/components/HydrationWidget';
 import { createClient } from '@/lib/supabase/server';
 import { formatDate } from '@/lib/utils';
@@ -166,6 +167,11 @@ export default async function DashboardPage() {
           locked={!isPro}
         />
       </div>
+
+      {/* Contador de calorias diário */}
+      <Card>
+        <CalorieWidget goalKcal={content?.total_calories ?? null} />
+      </Card>
 
       {/* Hidratação diária */}
       <Card>
