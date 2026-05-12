@@ -5,7 +5,15 @@ import { redirect } from 'next/navigation';
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const supabase = createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+
+  let user = null;
+  try {
+    const { data } = await supabase.auth.getUser();
+    user = data.user;
+  } catch {
+    redirect('/login');
+  }
+
   if (!user) redirect('/login');
 
   if (!user.user_metadata?.accepted_terms) redirect('/accept-terms');
