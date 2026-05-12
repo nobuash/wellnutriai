@@ -1,5 +1,6 @@
 import { AppShell } from '@/components/AppShell';
 import { Disclaimer } from '@/components/ui/Disclaimer';
+import { MobileInstallPrompt } from '@/components/MobileInstallPrompt';
 import { createClient } from '@/lib/supabase/server';
 import { redirect } from 'next/navigation';
 
@@ -36,6 +37,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     <AppShell plan={profile?.plan ?? 'free'} name={displayName}>
       <Disclaimer />
       {children}
+      <MobileInstallPrompt />
     </AppShell>
   );
 }
