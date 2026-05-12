@@ -26,9 +26,10 @@ export const metadata: Metadata = {
       { url: '/icons/icon-512x512.png', sizes: '512x512', type: 'image/png' },
     ],
     apple: [
-      { url: '/apple-touch-icon.png', sizes: '180x180', type: 'image/png' },
-      { url: '/icons/icon-152x152.png', sizes: '152x152', type: 'image/png' },
-      { url: '/icons/icon-167x167.png', sizes: '167x167', type: 'image/png' },
+      { url: '/apple-touch-icon.png' },
+      { url: '/icons/icon-152x152.png', sizes: '152x152' },
+      { url: '/icons/icon-167x167.png', sizes: '167x167' },
+      { url: '/icons/icon-180x180.png', sizes: '180x180' },
     ],
   },
 };
@@ -36,18 +37,6 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="pt-BR">
-      <head>
-        {/* iOS: adiciona à tela inicial como app nativo */}
-        <meta name="mobile-web-app-capable" content="yes" />
-        <meta name="apple-mobile-web-app-capable" content="yes" />
-        <meta name="apple-mobile-web-app-status-bar-style" content="default" />
-        <meta name="apple-mobile-web-app-title" content="WellNutriAI" />
-        {/* Ícones splash para iOS (iPad e iPhone) */}
-        <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
-        <link rel="apple-touch-icon" sizes="152x152" href="/icons/icon-152x152.png" />
-        <link rel="apple-touch-icon" sizes="167x167" href="/icons/icon-167x167.png" />
-        <link rel="apple-touch-icon" sizes="180x180" href="/icons/icon-180x180.png" />
-      </head>
       <body>
         <Providers>{children}</Providers>
       </body>
