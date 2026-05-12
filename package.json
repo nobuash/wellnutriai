@@ -11,6 +11,7 @@
     "ingest": "tsx scripts/ingest-knowledge.ts"
   },
   "dependencies": {
+    "@ducanh2912/next-pwa": "^10.2.9",
     "@hookform/resolvers": "^3.9.0",
     "@marsidev/react-turnstile": "^1.5.0",
     "@mercadopago/sdk-react": "^1.0.7",
