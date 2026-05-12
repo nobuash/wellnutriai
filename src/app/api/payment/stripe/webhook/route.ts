@@ -24,20 +24,31 @@ export async function POST(req: NextRequest) {
   const sig = req.headers.get('stripe-signature') ?? '';
   const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
 
+  if (!webhookSecret) {
+    console.error('[stripe/webhook] STRIPE_WEBHOOK_SECRET não configurado — rejeitando');
+    return NextResponse.json({ error: 'Webhook não configurado' }, { status: 500 });
+  }
+
   let event: Stripe.Event;
   try {
     const stripe = getStripe();
-    event = webhookSecret
-      ? stripe.webhooks.constructEvent(rawBody, sig, webhookSecret)
-      : (JSON.parse(rawBody) as Stripe.Event);
+    event = stripe.webhooks.constructEvent(rawBody, sig, webhookSecret);
   } catch (err) {
-    console.error('[stripe/webhook] signature error:', err);
-    return NextResponse.json({ error: 'Webhook inválido' }, { status: 400 });
+    console.error('[stripe/webhook] assinatura inválida:', (err as Error).message);
+    return NextResponse.json({ error: 'Assinatura inválida' }, { status: 400 });
   }
 
   const db = getServiceSupabase();
 
   try {
+    // Idempotência: ignora eventos Stripe já processados
+    const { error: dupErr } = await db
+      .from('processed_webhooks')
+      .insert({ id: `stripe_${event.id}` });
+    if (dupErr) {
+      return NextResponse.json({ ok: true });
+    }
+
     // Renovação paga com sucesso
     if (event.type === 'invoice.payment_succeeded') {
       const invoice = event.data.object as Stripe.Invoice;

@@ -2,6 +2,7 @@ import { MODELS, openai } from '@/lib/openai/client';
 import { formatKnowledgeContext, searchKnowledge } from '@/lib/knowledge/search';
 import { buildMealPlanPrompt, LEGAL_DISCLAIMER } from '@/lib/openai/prompts';
 import { canUseFeature } from '@/lib/plans';
+import { rateLimit } from '@/lib/ratelimit';
 import { createClient } from '@/lib/supabase/server';
 import type { MealPlanContent, NutritionQuestionnaire } from '@/types/database';
 import { NextResponse } from 'next/server';
@@ -12,11 +13,14 @@ export const maxDuration = 60;
 export async function POST() {
   const supabase = createClient();
 
-  // 1. Autenticação
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: 'Não autenticado' }, { status: 401 });
 
-  // 2. Verifica aceite de termos (backend — nunca confiar só no middleware)
+  // Rate limit: 5 gerações por hora por usuário
+  if (!rateLimit(`meal-plan:${user.id}`, 5, 3600)) {
+    return NextResponse.json({ error: 'Muitas requisições. Tente novamente em breve.' }, { status: 429 });
+  }
+
   const { data: profile } = await supabase
     .from('profiles')
     .select('plan, accepted_terms')
@@ -27,7 +31,6 @@ export async function POST() {
     return NextResponse.json({ error: 'Aceite os termos antes de usar' }, { status: 403 });
   }
 
-  // 3. Verifica limite do plano
   const startOfMonth = new Date();
   startOfMonth.setDate(1);
   startOfMonth.setHours(0, 0, 0, 0);
@@ -40,13 +43,9 @@ export async function POST() {
 
   const check = canUseFeature(profile.plan, 'mealPlansPerMonth', count ?? 0);
   if (!check.allowed) {
-    return NextResponse.json(
-      { error: check.reason, upgrade: true },
-      { status: 402 }
-    );
+    return NextResponse.json({ error: check.reason, upgrade: true }, { status: 402 });
   }
 
-  // 4. Busca questionário mais recente
   const { data: questionnaire } = (await supabase
     .from('nutrition_questionnaires')
     .select('*')
@@ -56,13 +55,9 @@ export async function POST() {
     .maybeSingle()) as { data: NutritionQuestionnaire | null };
 
   if (!questionnaire) {
-    return NextResponse.json(
-      { error: 'Responda o questionário primeiro' },
-      { status: 400 }
-    );
+    return NextResponse.json({ error: 'Responda o questionário primeiro' }, { status: 400 });
   }
 
-  // 5. Busca semântica na base de conhecimento + chama OpenAI
   const knowledgeQuery = `nutrição ${questionnaire.goal} ${questionnaire.activity_level} plano alimentar macronutrientes`;
   const knowledgeChunks = await searchKnowledge(knowledgeQuery, 5);
   const knowledgeContext = formatKnowledgeContext(knowledgeChunks);
@@ -82,11 +77,8 @@ export async function POST() {
     if (!raw) throw new Error('IA não retornou conteúdo');
 
     const content = JSON.parse(raw) as MealPlanContent;
-
-    // Garante disclaimer (defesa extra em caso de a IA omitir)
     content.disclaimer = content.disclaimer || LEGAL_DISCLAIMER;
 
-    // 6. Persiste no banco
     const { data: saved, error } = await supabase
       .from('meal_plans')
       .insert({
@@ -102,10 +94,7 @@ export async function POST() {
 
     return NextResponse.json({ mealPlan: saved });
   } catch (err) {
-    console.error('[meal-plan] error:', err);
-    return NextResponse.json(
-      { error: 'Falha ao gerar plano. Tente novamente.' },
-      { status: 500 }
-    );
+    console.error('[meal-plan] error:', (err as Error).message);
+    return NextResponse.json({ error: 'Falha ao gerar plano. Tente novamente.' }, { status: 500 });
   }
 }

@@ -2,6 +2,7 @@ import { MODELS, openai } from '@/lib/openai/client';
 import { formatKnowledgeContext, searchKnowledge } from '@/lib/knowledge/search';
 import { buildChatSystemPrompt } from '@/lib/openai/prompts';
 import { canUseFeature } from '@/lib/plans';
+import { rateLimit } from '@/lib/ratelimit';
 import { createClient } from '@/lib/supabase/server';
 import type { ChatMessage, MealPlan, MealPlanContent, NutritionQuestionnaire } from '@/types/database';
 import { NextResponse } from 'next/server';
@@ -20,6 +21,11 @@ export async function POST(req: Request) {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: 'Não autenticado' }, { status: 401 });
 
+  // Rate limit: 30 mensagens por minuto por usuário (burst protection)
+  if (!rateLimit(`chat:${user.id}`, 30, 60)) {
+    return NextResponse.json({ error: 'Muitas requisições. Aguarde um momento.' }, { status: 429 });
+  }
+
   const { data: profile } = await supabase
     .from('profiles')
     .select('plan, accepted_terms')
@@ -30,13 +36,13 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'Aceite os termos' }, { status: 403 });
   }
 
-  const json = await req.json();
+  const json = await req.json().catch(() => ({}));
   const parsed = bodySchema.safeParse(json);
   if (!parsed.success) {
     return NextResponse.json({ error: 'Mensagem inválida' }, { status: 400 });
   }
 
-  // Limite diário
+  // Limite diário por plano
   const startOfDay = new Date();
   startOfDay.setHours(0, 0, 0, 0);
 
@@ -52,7 +58,6 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: check.reason, upgrade: true }, { status: 402 });
   }
 
-  // Contexto: questionário + plano + histórico
   const [{ data: questionnaire }, { data: mealPlan }, { data: history }] = await Promise.all([
     supabase.from('nutrition_questionnaires').select('*').eq('user_id', user.id)
       .order('created_at', { ascending: false }).limit(1).maybeSingle(),
@@ -68,7 +73,6 @@ export async function POST(req: Request) {
 
   const mealPlanContent = (mealPlan?.content as MealPlanContent | undefined) ?? null;
 
-  // Busca semântica na base de conhecimento científico
   const knowledgeChunks = await searchKnowledge(parsed.data.message);
   const knowledgeContext = formatKnowledgeContext(knowledgeChunks);
 
@@ -80,7 +84,6 @@ export async function POST(req: Request) {
   }));
 
   try {
-    // Salva mensagem do usuário
     await supabase.from('chat_messages').insert({
       user_id: user.id, role: 'user', message: parsed.data.message,
     });
@@ -112,10 +115,7 @@ export async function POST(req: Request) {
 
         await supabase
           .from('meal_plans')
-          .update({
-            content: updatedContent,
-            calories_estimate: updatedContent.total_calories ?? null,
-          })
+          .update({ content: updatedContent, calories_estimate: updatedContent.total_calories ?? null })
           .eq('id', mealPlan.id);
 
         mealPlanUpdated = true;
@@ -130,7 +130,7 @@ export async function POST(req: Request) {
 
     return NextResponse.json({ reply, mealPlanUpdated });
   } catch (err) {
-    console.error('[chat] error:', err);
+    console.error('[chat] error:', (err as Error).message);
     return NextResponse.json({ error: 'Falha no chat' }, { status: 500 });
   }
 }

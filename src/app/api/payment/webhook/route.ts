@@ -34,8 +34,10 @@ export async function POST(req: NextRequest) {
 
   console.log(`[webhook] type=${type} dataId=${dataId} sig=${xSignature ? 'present' : 'absent'} body=${rawBody.slice(0, 300)}`);
 
-  if (xSignature && !verifyMPSignature(xSignature, xRequestId, dataId)) {
-    console.warn('[webhook] Assinatura inválida — processando mesmo assim para diagnóstico');
+  // Rejeita se assinatura ausente ou inválida — nunca processar sem verificação
+  if (!xSignature || !verifyMPSignature(xSignature, xRequestId, dataId)) {
+    console.warn('[webhook] Assinatura MP inválida ou ausente — rejeitando');
+    return NextResponse.json({ error: 'Assinatura inválida' }, { status: 401 });
   }
 
   if (!dataId) {
@@ -46,6 +48,16 @@ export async function POST(req: NextRequest) {
   const supabase = getServiceClient();
 
   try {
+    // Idempotência: ignora eventos já processados
+    const eventKey = `mp_${type}_${dataId}`;
+    const { error: dupErr } = await supabase
+      .from('processed_webhooks')
+      .insert({ id: eventKey });
+    if (dupErr) {
+      // Conflito de chave primária = já processado
+      return NextResponse.json({ ok: true });
+    }
+
     // PIX — pagamento único
     if (type === 'payment') {
       const payment = await getPayment().get({ id: Number(dataId) });
