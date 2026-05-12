@@ -4,7 +4,7 @@ import { cn } from '@/lib/utils';
 import { createClient } from '@/lib/supabase/client';
 import {
   Camera, ClipboardList, HeadphonesIcon, LayoutDashboard, LogOut,
-  MessageCircle, Sparkles, Utensils, X,
+  MessageCircle, Smartphone, Sparkles, Utensils, X,
 } from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
@@ -17,6 +17,7 @@ const nav = [
   { href: '/meal-plan', label: 'Plano Alimentar', icon: Utensils },
   { href: '/chat', label: 'Chat IA', icon: MessageCircle, pro: true },
   { href: '/photo-analysis', label: 'Análise por Foto', icon: Camera, pro: true },
+  { href: '/install-app', label: 'Instalar no celular', icon: Smartphone },
   { href: '/support', label: 'Suporte', icon: HeadphonesIcon },
 ];
 
