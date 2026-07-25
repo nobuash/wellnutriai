@@ -22,9 +22,7 @@ export default function ForgotPasswordPage() {
   } = useForm<ForgotPasswordInput>({ resolver: zodResolver(forgotPasswordSchema) });
 
   async function onSubmit({ email }: ForgotPasswordInput) {
-    const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${window.location.origin}/auth/callback?next=/reset-password`,
-    });
+    const { error } = await supabase.auth.resetPasswordForEmail(email);
 
     if (error) {
       toast.error('Não foi possível enviar o e-mail. Tente novamente.');
