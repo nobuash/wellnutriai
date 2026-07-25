@@ -49,13 +49,20 @@ export default function LoginPage() {
           {...register('email')}
           error={errors.email?.message}
         />
-        <Input
-          label="Senha"
-          type="password"
-          autoComplete="current-password"
-          {...register('password')}
-          error={errors.password?.message}
-        />
+        <div>
+          <Input
+            label="Senha"
+            type="password"
+            autoComplete="current-password"
+            {...register('password')}
+            error={errors.password?.message}
+          />
+          <div className="text-right mt-1">
+            <Link href="/forgot-password" className="text-sm text-brand-600 hover:underline">
+              Esqueci minha senha
+            </Link>
+          </div>
+        </div>
         <Button type="submit" className="w-full" loading={isSubmitting}>
           Entrar
         </Button>

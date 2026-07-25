@@ -19,6 +19,18 @@ export const loginSchema = z.object({
   password: z.string().min(1, 'Obrigatório'),
 });
 
+export const forgotPasswordSchema = z.object({
+  email: z.string().email('E-mail inválido'),
+});
+
+export const resetPasswordSchema = z.object({
+  password: z.string().min(8, 'Mínimo 8 caracteres'),
+  confirmPassword: z.string().min(1, 'Obrigatório'),
+}).refine((d) => d.password === d.confirmPassword, {
+  message: 'As senhas não coincidem',
+  path: ['confirmPassword'],
+});
+
 export const questionnaireSchema = z.object({
   age: z.coerce.number().int().min(12).max(100),
   weight: z.coerce.number().min(30).max(300),
@@ -39,4 +51,6 @@ export const questionnaireSchema = z.object({
 
 export type SignupInput = z.infer<typeof signupSchema>;
 export type LoginInput = z.infer<typeof loginSchema>;
+export type ForgotPasswordInput = z.infer<typeof forgotPasswordSchema>;
+export type ResetPasswordInput = z.infer<typeof resetPasswordSchema>;
 export type QuestionnaireInput = z.infer<typeof questionnaireSchema>;
