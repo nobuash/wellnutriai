@@ -9,7 +9,15 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Lock, Send, Sparkles } from 'lucide-react';
 import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
+import Markdown from 'react-markdown';
 import { toast } from 'sonner';
+
+const markdownComponents = {
+  p: ({ ...props }) => <p className="mb-2 last:mb-0 leading-relaxed" {...props} />,
+  ul: ({ ...props }) => <ul className="mb-2 last:mb-0 list-disc pl-4 space-y-0.5" {...props} />,
+  ol: ({ ...props }) => <ol className="mb-2 last:mb-0 list-decimal pl-4 space-y-0.5" {...props} />,
+  strong: ({ ...props }) => <strong className="font-semibold" {...props} />,
+};
 
 export default function ChatPage() {
   const supabase = createClient();
@@ -132,7 +140,11 @@ export default function ChatPage() {
                   : 'bg-slate-100 text-slate-800 rounded-bl-sm',
               )}
             >
-              {m.message}
+              {m.role === 'ai' ? (
+                <Markdown components={markdownComponents}>{m.message}</Markdown>
+              ) : (
+                m.message
+              )}
             </div>
           ))}
           {send.isPending && (

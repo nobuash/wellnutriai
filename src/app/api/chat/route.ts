@@ -64,7 +64,7 @@ export async function POST(req: Request) {
     supabase.from('meal_plans').select('*').eq('user_id', user.id)
       .order('created_at', { ascending: false }).limit(1).maybeSingle(),
     supabase.from('chat_messages').select('*').eq('user_id', user.id)
-      .order('created_at', { ascending: false }).limit(10),
+      .order('created_at', { ascending: false }).limit(20),
   ]) as [
     { data: NutritionQuestionnaire | null },
     { data: MealPlan | null },
@@ -91,7 +91,7 @@ export async function POST(req: Request) {
     const completion = await openai.chat.completions.create({
       model: MODELS.TEXT,
       response_format: { type: 'json_object' },
-      temperature: 0.5,
+      temperature: 0.7,
       messages: [
         { role: 'system', content: systemPrompt },
         ...historyMessages,

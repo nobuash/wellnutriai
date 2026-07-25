@@ -5,6 +5,6 @@ export const openai = new OpenAI({
 });
 
 export const MODELS = {
-  TEXT: 'gpt-4o-mini',
+  TEXT: 'gpt-4.1-mini',
   VISION: 'gpt-4o',
 } as const;
