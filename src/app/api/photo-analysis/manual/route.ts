@@ -4,7 +4,11 @@ import { featureLimitReason, PLAN_LIMITS } from '@/lib/plans';
 import { getUserEntitlement } from '@/lib/entitlement';
 import { checkDailyAiBudget, checkUserMonthlyBudget, consumeUsageQuota, logAiUsage, monthKey } from '@/lib/aiUsage';
 import { photoAnalysisResultSchema } from '@/lib/photoAnalysisSchema';
+import { requireCurrentConsent, consentReasonMessage } from '@/lib/consentCheck';
+import { checkDistributedRateLimit } from '@/lib/distributedRateLimit';
+import { rateLimit } from '@/lib/ratelimit';
 import { createClient } from '@/lib/supabase/server';
+import { createServiceClient } from '@/lib/supabase/service';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 
@@ -24,14 +28,18 @@ export async function POST(req: Request) {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: 'Não autenticado' }, { status: 401 });
 
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('accepted_terms')
-    .eq('id', user.id)
-    .single();
+  // Não existia rate limit nenhum nesta rota antes (burst local +
+  // distribuído, mesmo padrão das outras rotas de IA).
+  if (!rateLimit(`photo-manual:${user.id}`, 10, 3600)) {
+    return NextResponse.json({ error: 'Muitas requisições. Tente novamente em breve.' }, { status: 429 });
+  }
+  if (!(await checkDistributedRateLimit(`photo-manual:${user.id}`, 10, 3600))) {
+    return NextResponse.json({ error: 'Muitas requisições. Tente novamente em breve.' }, { status: 429 });
+  }
 
-  if (!profile?.accepted_terms) {
-    return NextResponse.json({ error: 'Aceite os termos' }, { status: 403 });
+  const consent = await requireCurrentConsent(supabase, user.id);
+  if (!consent.ok) {
+    return NextResponse.json({ error: consentReasonMessage(consent.reason!) }, { status: 403 });
   }
 
   const entitlement = await getUserEntitlement(supabase, user.id);
@@ -52,7 +60,7 @@ export async function POST(req: Request) {
   // Mesmo balde de cota da análise por foto — é a mesma feature PRO,
   // só com outra forma de entrada.
   const limit = PLAN_LIMITS[entitlement.plan].photoAnalysisPerMonth;
-  const quota = await consumeUsageQuota(supabase, user.id, 'photo_analysis', monthKey(), limit);
+  const quota = await consumeUsageQuota(user.id, 'photo_analysis', monthKey(), limit);
   if (!quota.allowed) {
     return NextResponse.json(
       { error: featureLimitReason(entitlement.plan, 'photoAnalysisPerMonth'), upgrade: entitlement.plan === 'free' },
@@ -105,8 +113,9 @@ export async function POST(req: Request) {
     }
     const result = parsedResult.data;
 
-    // Salva no histórico reutilizando a mesma tabela
-    await supabase.from('meal_photo_analysis').insert({
+    // Salva no histórico reutilizando a mesma tabela — só service_role
+    // pode escrever (ver 017_restrict_server_generated_tables.sql).
+    await createServiceClient().from('meal_photo_analysis').insert({
       user_id: user.id,
       image_url: 'manual', // sem foto
       result,

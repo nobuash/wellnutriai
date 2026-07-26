@@ -10,8 +10,11 @@ import {
   MEDICAL_RESTRICTION_MESSAGE,
   mealPlanContentSchema,
 } from '@/lib/mealPlanSafety';
+import { requireCurrentConsent, consentReasonMessage } from '@/lib/consentCheck';
+import { checkDistributedRateLimit } from '@/lib/distributedRateLimit';
 import { rateLimit } from '@/lib/ratelimit';
 import { createClient } from '@/lib/supabase/server';
+import { createServiceClient } from '@/lib/supabase/service';
 import type { NutritionQuestionnaire } from '@/types/database';
 import { NextResponse } from 'next/server';
 
@@ -24,19 +27,17 @@ export async function POST() {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: 'Não autenticado' }, { status: 401 });
 
-  // Rate limit: 5 gerações por hora por usuário (burst protection local)
+  // Burst local (rápido) + distribuído (funciona entre instâncias Vercel).
   if (!rateLimit(`meal-plan:${user.id}`, 5, 3600)) {
     return NextResponse.json({ error: 'Muitas requisições. Tente novamente em breve.' }, { status: 429 });
   }
+  if (!(await checkDistributedRateLimit(`meal-plan:${user.id}`, 5, 3600))) {
+    return NextResponse.json({ error: 'Muitas requisições. Tente novamente em breve.' }, { status: 429 });
+  }
 
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('accepted_terms')
-    .eq('id', user.id)
-    .single();
-
-  if (!profile?.accepted_terms) {
-    return NextResponse.json({ error: 'Aceite os termos antes de usar' }, { status: 403 });
+  const consent = await requireCurrentConsent(supabase, user.id);
+  if (!consent.ok) {
+    return NextResponse.json({ error: consentReasonMessage(consent.reason!) }, { status: 403 });
   }
 
   const { data: questionnaire } = (await supabase
@@ -79,7 +80,7 @@ export async function POST() {
   }
 
   const limit = PLAN_LIMITS[entitlement.plan].mealPlansPerMonth;
-  const quota = await consumeUsageQuota(supabase, user.id, 'meal_plan', monthKey(), limit);
+  const quota = await consumeUsageQuota(user.id, 'meal_plan', monthKey(), limit);
   if (!quota.allowed) {
     return NextResponse.json(
       { error: featureLimitReason(entitlement.plan, 'mealPlansPerMonth'), upgrade: entitlement.plan === 'free' },
@@ -113,7 +114,9 @@ export async function POST() {
       );
     }
 
-    const { data: saved, error } = await supabase
+    // meal_plans só aceita escrita via service_role (RLS) — ver
+    // 017_restrict_server_generated_tables.sql.
+    const { data: saved, error } = await createServiceClient()
       .from('meal_plans')
       .insert({
         user_id: user.id,

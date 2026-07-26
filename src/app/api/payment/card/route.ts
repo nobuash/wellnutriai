@@ -27,7 +27,7 @@ export async function POST(req: Request) {
   if (!user) return NextResponse.json({ error: 'Não autenticado' }, { status: 401 });
 
   // Rate limit distribuído: 10 tentativas de cobrança por hora por usuário
-  if (!(await checkDistributedRateLimit(supabase, `payment-card:${user.id}`, 10, 3600))) {
+  if (!(await checkDistributedRateLimit(`payment-card:${user.id}`, 10, 3600))) {
     return NextResponse.json({ error: 'Muitas tentativas. Tente novamente em breve.' }, { status: 429 });
   }
 

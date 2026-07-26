@@ -14,7 +14,7 @@ export async function POST(req: Request) {
   }
 
   // Rate limit distribuído: 10 tentativas por hora por usuário
-  if (!(await checkDistributedRateLimit(supabase, `payment-subscribe:${user.id}`, 10, 3600))) {
+  if (!(await checkDistributedRateLimit(`payment-subscribe:${user.id}`, 10, 3600))) {
     return NextResponse.json({ error: 'Muitas tentativas. Tente novamente em breve.' }, { status: 429 });
   }
 

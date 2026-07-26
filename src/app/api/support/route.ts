@@ -1,3 +1,4 @@
+import { checkDistributedRateLimit } from '@/lib/distributedRateLimit';
 import { rateLimit } from '@/lib/ratelimit';
 import { createClient } from '@/lib/supabase/server';
 import { NextResponse } from 'next/server';
@@ -34,8 +35,11 @@ export async function POST(req: Request) {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: 'Não autenticado' }, { status: 401 });
 
-  // Rate limit: 5 mensagens de suporte por hora por usuário
+  // Burst local (rápido) + distribuído (funciona entre instâncias Vercel).
   if (!rateLimit(`support:${user.id}`, 5, 3600)) {
+    return NextResponse.json({ error: 'Muitas mensagens enviadas. Tente novamente em breve.' }, { status: 429 });
+  }
+  if (!(await checkDistributedRateLimit(`support:${user.id}`, 5, 3600))) {
     return NextResponse.json({ error: 'Muitas mensagens enviadas. Tente novamente em breve.' }, { status: 429 });
   }
 

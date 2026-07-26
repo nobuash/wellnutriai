@@ -28,6 +28,14 @@ export interface NutritionQuestionnaire {
   disliked_foods: string[];
   meals_per_day: number;
   routine: string | null;
+  is_pregnant: boolean;
+  is_breastfeeding: boolean;
+  has_kidney_disease: boolean;
+  has_liver_disease: boolean;
+  has_eating_disorder_history: boolean;
+  has_severe_allergy: boolean;
+  uses_insulin: boolean;
+  other_medical_condition: string | null;
   created_at: string;
 }
 

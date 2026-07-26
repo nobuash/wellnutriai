@@ -12,7 +12,7 @@ export async function POST(req: Request) {
   if (!user) return NextResponse.json({ error: 'Não autenticado' }, { status: 401 });
 
   // Rate limit distribuído: 10 tentativas de gerar PIX por hora por usuário
-  if (!(await checkDistributedRateLimit(supabase, `payment-pix:${user.id}`, 10, 3600))) {
+  if (!(await checkDistributedRateLimit(`payment-pix:${user.id}`, 10, 3600))) {
     return NextResponse.json({ error: 'Muitas tentativas. Tente novamente em breve.' }, { status: 429 });
   }
 

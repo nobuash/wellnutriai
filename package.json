@@ -8,6 +8,8 @@
     "start": "next start",
     "lint": "next lint",
     "type-check": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "ingest": "tsx scripts/ingest-knowledge.ts"
   },
   "dependencies": {
@@ -42,6 +44,7 @@
     "@types/pdf-parse": "^1.1.5",
     "@types/react": "^18.3.11",
     "@types/react-dom": "^18.3.0",
+    "@vitest/ui": "^4.1.10",
     "autoprefixer": "^10.4.20",
     "eslint": "^8.57.1",
     "eslint-config-next": "14.2.35",
@@ -49,6 +52,7 @@
     "postcss": "^8.4.47",
     "tailwindcss": "^3.4.13",
     "tsx": "^4.21.0",
-    "typescript": "^5.6.2"
+    "typescript": "^5.6.2",
+    "vitest": "^4.1.10"
   }
 }
