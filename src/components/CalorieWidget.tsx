@@ -1,6 +1,5 @@
 'use client';
 
-import { Button } from '@/components/ui/Button';
 import { createClient } from '@/lib/supabase/client';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Flame, Trash2 } from 'lucide-react';
