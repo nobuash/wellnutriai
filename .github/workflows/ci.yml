@@ -1,0 +1,45 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Type check
+        run: npm run type-check
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Build
+        run: npm run build
+        env:
+          # Valores fictícios só para o build passar (validação de env
+          # obrigatória em next.config.js, chamadas reais à OpenAI/Stripe/
+          # Mercado Pago não acontecem em build time, só em runtime).
+          # Nunca aponte isso para um projeto Supabase real.
+          NEXT_PUBLIC_SUPABASE_URL: https://ci-placeholder.supabase.co
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ci-placeholder-anon-key
+          SUPABASE_SERVICE_ROLE_KEY: ci-placeholder-service-role-key
+          OPENAI_API_KEY: sk-ci-placeholder
+          NEXT_PUBLIC_APP_URL: http://localhost:3000
+
+  # NOTA: não há testes automatizados neste repositório ainda (sem
+  # Jest/Vitest/Playwright configurado — ver docs/production-hardening-audit.md).
+  # Quando existirem, adicione um job aqui rodando `npm run test` com
+  # mocks para OpenAI/Stripe/Mercado Pago/e-mail, sem chamar as APIs
+  # reais nem fazer cobranças.
