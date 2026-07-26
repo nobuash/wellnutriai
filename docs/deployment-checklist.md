@@ -7,8 +7,37 @@ depende delas.
 
 ## 1. Banco de dados (Supabase SQL Editor, em ordem)
 
+**⚠️ NÃO assuma que uma migration já foi aplicada só porque o número é
+baixo.** Durante o deploy do round 2 (2026-07-26) descobrimos que
+`004_diabetes_type.sql` e, na primeira tentativa, `019_expand_medical_screening.sql`
+nunca tinham sido aplicadas de verdade em produção — a suposição de que
+"001–006 já estavam aplicadas" estava errada, e só foi pega porque o
+INSERT do questionário passou a falhar com "column does not exist".
+Também descobrimos colunas em produção (`subscriptions.expires_at`,
+`subscriptions.payment_type`) que não existem em NENHUM arquivo de
+migration do repositório — ou seja, o schema real já recebeu alterações
+manuais fora do controle de versão em algum momento antes deste projeto
+ser hardenizado. **Antes de assumir que o schema está em dia, rode:**
+
+```sql
+select table_name, column_name, data_type
+from information_schema.columns
+where table_schema = 'public'
+order by table_name, ordinal_position;
+
+select conrelid::regclass as table_name, conname, contype, convalidated
+from pg_constraint
+where connamespace = 'public'::regnamespace
+order by table_name, conname;
+```
+
+e compare manualmente contra o que cada migration em `supabase/migrations/`
+diz que deveria existir, em vez de confiar no número do arquivo ou em
+"deu sucesso" de uma tentativa anterior.
+
 Rode cada arquivo de `supabase/migrations/007_*.sql` até `020_*.sql` (as
-`001`–`006` já devem estar aplicadas em produção). Todas são idempotentes
+`001`–`006` deveriam já estar aplicadas em produção, mas confirme antes —
+ver aviso acima). Todas são idempotentes
 (`IF NOT EXISTS` / `DROP POLICY IF EXISTS` antes de recriar, ou
 `NOT VALID` + validação best-effort quando pode haver dado antigo
 divergente) e seguras para rodar contra o banco existente:
