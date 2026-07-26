@@ -12,7 +12,7 @@ jobs:
       # Valores fictícios só para next.config.js não travar (ele valida env
       # obrigatória, e tanto `next lint` quanto `next build` carregam esse
       # arquivo). Chamadas reais à OpenAI/Stripe/Mercado Pago não acontecem
-      # em build/lint time, só em runtime. Nunca aponte isso para um
+      # em build/lint/test time, só em runtime. Nunca aponte isso para um
       # projeto Supabase real.
       NEXT_PUBLIC_SUPABASE_URL: https://ci-placeholder.supabase.co
       NEXT_PUBLIC_SUPABASE_ANON_KEY: ci-placeholder-anon-key
@@ -36,11 +36,16 @@ jobs:
       - name: Lint
         run: npm run lint
 
+      - name: Unit tests
+        run: npm run test
+
       - name: Build
         run: npm run build
 
-  # NOTA: não há testes automatizados neste repositório ainda (sem
-  # Jest/Vitest/Playwright configurado — ver docs/production-hardening-audit.md).
-  # Quando existirem, adicione um job aqui rodando `npm run test` com
-  # mocks para OpenAI/Stripe/Mercado Pago/e-mail, sem chamar as APIs
-  # reais nem fazer cobranças.
+  # NOTA: só há testes unitários (Vitest) — funções puras sem I/O, ver
+  # src/lib/__tests__/ e src/lib/mercadopago/__tests__/. Não há testes
+  # de integração (banco/Storage reais) nem E2E (Playwright) ainda —
+  # ver docs/production-hardening-round-2.md pra escopo e justificativa.
+  # Quando existirem, um job separado deve rodar contra um projeto
+  # Supabase de teste dedicado e chaves sandbox de Stripe/Mercado Pago,
+  # nunca contra produção.

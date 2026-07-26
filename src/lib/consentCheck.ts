@@ -18,6 +18,29 @@ export function consentReasonMessage(reason: ConsentReason): string {
   return REASON_MESSAGES[reason];
 }
 
+export interface ConsentProfileFields {
+  accepted_terms: boolean | null;
+  terms_version: string | null;
+  privacy_version: string | null;
+}
+
+/**
+ * Função pura — decide se o consentimento está em dia, dado o estado
+ * do profile e as versões atuais exigidas. Separada de
+ * requireCurrentConsent() especificamente pra ser testável sem mockar
+ * o Supabase (ver src/lib/__tests__/consentCheck.test.ts).
+ */
+export function evaluateConsent(
+  profile: ConsentProfileFields | null,
+  currentTermsVersion: string,
+  currentPrivacyVersion: string,
+): ConsentCheckResult {
+  if (!profile?.accepted_terms) return { ok: false, reason: 'not_accepted' };
+  if (profile.terms_version !== currentTermsVersion) return { ok: false, reason: 'outdated_terms' };
+  if (profile.privacy_version !== currentPrivacyVersion) return { ok: false, reason: 'outdated_privacy' };
+  return { ok: true };
+}
+
 /**
  * Checagem centralizada de consentimento — usada por toda API sensível
  * (geração de plano, chat, análise de foto, questionário). Antes, cada
@@ -39,8 +62,5 @@ export async function requireCurrentConsent(
     .eq('id', userId)
     .single();
 
-  if (!profile?.accepted_terms) return { ok: false, reason: 'not_accepted' };
-  if (profile.terms_version !== TERMS_VERSION) return { ok: false, reason: 'outdated_terms' };
-  if (profile.privacy_version !== PRIVACY_VERSION) return { ok: false, reason: 'outdated_privacy' };
-  return { ok: true };
+  return evaluateConsent(profile, TERMS_VERSION, PRIVACY_VERSION);
 }
