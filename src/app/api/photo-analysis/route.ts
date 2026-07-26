@@ -73,7 +73,7 @@ export async function POST(req: Request) {
   }
 
   const limit = PLAN_LIMITS[entitlement.plan].photoAnalysisPerMonth;
-  const quota = await consumeUsageQuota(supabase, user.id, 'photo_analysis', monthKey(), limit);
+  const quota = await consumeUsageQuota(user.id, 'photo_analysis', monthKey(), limit);
   if (!quota.allowed) {
     return NextResponse.json(
       { error: featureLimitReason(entitlement.plan, 'photoAnalysisPerMonth'), upgrade: entitlement.plan === 'free' },

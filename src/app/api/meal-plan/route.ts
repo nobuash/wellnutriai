@@ -79,7 +79,7 @@ export async function POST() {
   }
 
   const limit = PLAN_LIMITS[entitlement.plan].mealPlansPerMonth;
-  const quota = await consumeUsageQuota(supabase, user.id, 'meal_plan', monthKey(), limit);
+  const quota = await consumeUsageQuota(user.id, 'meal_plan', monthKey(), limit);
   if (!quota.allowed) {
     return NextResponse.json(
       { error: featureLimitReason(entitlement.plan, 'mealPlansPerMonth'), upgrade: entitlement.plan === 'free' },

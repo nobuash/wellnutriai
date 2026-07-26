@@ -66,7 +66,7 @@ export async function POST(req: Request) {
   }
 
   const limit = PLAN_LIMITS[entitlement.plan].chatMessagesPerMonth;
-  const quota = await consumeUsageQuota(supabase, user.id, 'chat', monthKey(), limit);
+  const quota = await consumeUsageQuota(user.id, 'chat', monthKey(), limit);
   if (!quota.allowed) {
     return NextResponse.json(
       { error: featureLimitReason(entitlement.plan, 'chatMessagesPerMonth'), upgrade: entitlement.plan === 'free' },

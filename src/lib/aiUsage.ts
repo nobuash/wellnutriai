@@ -1,5 +1,4 @@
 import { createServiceClient } from '@/lib/supabase/service';
-import type { SupabaseClient } from '@supabase/supabase-js';
 
 export type AiFeature = 'meal_plan' | 'chat' | 'photo_analysis' | 'photo_analysis_manual';
 
@@ -151,15 +150,21 @@ export async function checkUserMonthlyBudget(userId: string): Promise<UserBudget
  * Postgres (consume_usage_quota) — evita a corrida de "SELECT count
  * depois INSERT" que duas requisições simultâneas poderiam furar.
  * limit < 0 = ilimitado.
+ *
+ * A RPC só é executável por service_role (ver
+ * 013_lock_down_security_definer_rpcs.sql) — antes, qualquer usuário
+ * autenticado podia chamá-la direto do client SDK com um p_user_id
+ * arbitrário e esgotar a cota de outra pessoa. Por isso este helper
+ * sempre usa o service client internamente.
  */
 export async function consumeUsageQuota(
-  supabase: SupabaseClient,
   userId: string,
   feature: string,
   periodKey: string,
   limit: number,
 ): Promise<{ allowed: boolean; currentCount: number }> {
-  const { data, error } = await supabase
+  const service = createServiceClient();
+  const { data, error } = await service
     .rpc('consume_usage_quota', {
       p_user_id: userId,
       p_feature: feature,

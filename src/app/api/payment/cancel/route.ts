@@ -37,7 +37,7 @@ export async function POST() {
     return NextResponse.json({ error: 'Não autenticado' }, { status: 401 });
   }
 
-  if (!(await checkDistributedRateLimit(supabase, `payment-cancel:${user.id}`, 10, 3600))) {
+  if (!(await checkDistributedRateLimit(`payment-cancel:${user.id}`, 10, 3600))) {
     return NextResponse.json({ error: 'Muitas tentativas. Tente novamente em breve.' }, { status: 429 });
   }
 

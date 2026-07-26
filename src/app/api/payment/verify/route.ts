@@ -16,7 +16,7 @@ export async function POST(req: Request) {
   // Rate limit distribuído. A UI já faz polling automático a cada 5s
   // por até 30min enquanto o modal do PIX está aberto (~360 chamadas),
   // então o limite precisa folgar bastante acima disso.
-  if (!(await checkDistributedRateLimit(supabase, `payment-verify:${user.id}`, 500, 3600))) {
+  if (!(await checkDistributedRateLimit(`payment-verify:${user.id}`, 500, 3600))) {
     return NextResponse.json({ error: 'Muitas tentativas. Tente novamente em breve.' }, { status: 429 });
   }
 
