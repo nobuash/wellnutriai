@@ -1,7 +1,9 @@
 import { getPayment, PLANS, type PlanInterval } from '@/lib/mercadopago/client';
 import { checkDistributedRateLimit } from '@/lib/distributedRateLimit';
+import { consentReasonMessage, requireCurrentConsent } from '@/lib/consentCheck';
 import { createClient } from '@/lib/supabase/server';
 import { createServiceClient } from '@/lib/supabase/service';
+import { requireSupabaseSuccess } from '@/lib/supabaseErrors';
 import { NextResponse } from 'next/server';
 
 export const runtime = 'nodejs';
@@ -14,6 +16,11 @@ export async function POST(req: Request) {
   // Rate limit distribuído: 10 tentativas de gerar PIX por hora por usuário
   if (!(await checkDistributedRateLimit(`payment-pix:${user.id}`, 10, 3600))) {
     return NextResponse.json({ error: 'Muitas tentativas. Tente novamente em breve.' }, { status: 429 });
+  }
+
+  const consent = await requireCurrentConsent(supabase, user.id);
+  if (!consent.ok) {
+    return NextResponse.json({ error: consentReasonMessage(consent.reason!) }, { status: 403 });
   }
 
   const body = await req.json().catch(() => ({})) as { planInterval?: string };
@@ -66,7 +73,7 @@ export async function POST(req: Request) {
 
     // subscriptions só aceita escrita via service_role (RLS) — ver
     // 007_normalize_subscriptions.sql.
-    await createServiceClient().from('subscriptions').upsert(
+    await requireSupabaseSuccess(createServiceClient().from('subscriptions').upsert(
       {
         user_id: user.id,
         plan: 'pro',
@@ -80,7 +87,7 @@ export async function POST(req: Request) {
         billing_interval: planInterval,
       },
       { onConflict: 'mp_subscription_id' }
-    );
+    ));
 
     return NextResponse.json({ payment_id: result.id, qr_code: qrCode, qr_code_base64: qrCodeBase64 });
   } catch (err) {

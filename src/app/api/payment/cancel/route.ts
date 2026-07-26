@@ -2,8 +2,10 @@ import { getPreApproval } from '@/lib/mercadopago/client';
 import { getStripe } from '@/lib/stripe/client';
 import { checkDistributedRateLimit } from '@/lib/distributedRateLimit';
 import { recalculateVisualPlanCache } from '@/lib/subscriptionCache';
+import { requireSupabaseSuccess } from '@/lib/supabaseErrors';
 import { createClient } from '@/lib/supabase/server';
 import { createServiceClient } from '@/lib/supabase/service';
+import { isRecurringSubscriptionRow } from '@/lib/subscriptionTypes';
 import { NextResponse } from 'next/server';
 
 export const runtime = 'nodejs';
@@ -42,19 +44,49 @@ export async function POST() {
     return NextResponse.json({ error: 'Muitas tentativas. Tente novamente em breve.' }, { status: 429 });
   }
 
-  // Busca especificamente uma assinatura RECORRENTE ativa — não "a
-  // linha mais recente" (que poderia ser um PIX pendente mais novo
+  // Busca TODAS as linhas ativas do usuário e decide quais são
+  // assinaturas RECORRENTES via isRecurringSubscriptionRow — não confia
+  // só em payment_type='subscription' na query (esse valor já foi
+  // gravado errado uma vez para assinaturas Stripe; ver
+  // src/lib/subscriptionTypes.ts e migration 021). Nem "a linha mais
+  // recente" isolada (que poderia ser um PIX pendente mais novo
   // escondendo uma assinatura Stripe ativa mais antiga; ver
-  // src/lib/entitlement.ts). Cancelamento só faz sentido para isso.
-  const { data: activeSub } = await supabase
+  // src/lib/entitlement.ts).
+  const { data: activeRows } = await supabase
     .from('subscriptions')
     .select('id, provider, provider_subscription_id, payment_type, status, current_period_end, cancel_at_period_end')
     .eq('user_id', user.id)
     .eq('status', 'active')
-    .eq('payment_type', 'subscription')
     .order('created_at', { ascending: false })
-    .limit(1)
-    .maybeSingle<SubscriptionRow>();
+    .returns<SubscriptionRow[]>();
+
+  const recurringSubs = (activeRows ?? []).filter(isRecurringSubscriptionRow);
+
+  if (recurringSubs.length > 1) {
+    // Duas assinaturas recorrentes ativas ao mesmo tempo não deveria
+    // acontecer (índice único de 016_subscription_integrity.sql previne
+    // daqui pra frente), mas se existir dado histórico assim, cancelar
+    // "a primeira que achar" silenciosamente pode deixar a outra
+    // cobrando sem que ninguém perceba — melhor parar e pedir revisão.
+    console.error(
+      `[payment/cancel] user=${user.id} tem ${recurringSubs.length} assinaturas recorrentes ativas simultâneas — requer revisão manual`,
+      recurringSubs.map((s) => s.id),
+    );
+    await logCancelAudit(createServiceClient(), user.id, {
+      issue: 'multiple_active_recurring_subscriptions',
+      subscription_ids: recurringSubs.map((s) => s.id),
+    });
+    return NextResponse.json(
+      {
+        error:
+          'Encontramos mais de uma assinatura ativa na sua conta ao mesmo tempo. ' +
+          'Nosso suporte precisa revisar antes de cancelar para não deixar nenhuma cobrança solta — entre em contato.',
+      },
+      { status: 409 },
+    );
+  }
+
+  const activeSub = recurringSubs[0] ?? null;
 
   if (activeSub?.cancel_at_period_end) {
     return NextResponse.json({ ok: true, alreadyCanceled: true, accessUntil: activeSub.current_period_end });
@@ -109,10 +141,10 @@ export async function POST() {
       // O acesso PRO continua até o fim do período já pago — não rebaixamos
       // profiles.plan aqui. O rebaixamento definitivo acontece via webhook
       // (customer.subscription.deleted) quando o período efetivamente termina.
-      await service
+      await requireSupabaseSuccess(service
         .from('subscriptions')
         .update({ cancel_at_period_end: true })
-        .eq('id', activeSub.id);
+        .eq('id', activeSub.id));
 
       await logCancelAudit(service, user.id, { provider: 'stripe', subscription_id: 'masked' });
 
@@ -135,10 +167,10 @@ export async function POST() {
         body: { status: 'cancelled' },
       });
 
-      await service
+      await requireSupabaseSuccess(service
         .from('subscriptions')
         .update({ status: 'canceled', mp_status: 'cancelled', canceled_at: new Date().toISOString() })
-        .eq('id', activeSub.id);
+        .eq('id', activeSub.id));
 
       await recalculateVisualPlanCache(service, user.id);
       await logCancelAudit(service, user.id, { provider: 'mercadopago', subscription_id: 'masked' });

@@ -1,6 +1,7 @@
 import { getStripe, STRIPE_INTERVALS } from '@/lib/stripe/client';
 import { type PlanInterval } from '@/lib/mercadopago/client';
 import { checkDistributedRateLimit } from '@/lib/distributedRateLimit';
+import { consentReasonMessage, requireCurrentConsent } from '@/lib/consentCheck';
 import { findActiveStripeSubscription } from '@/lib/stripe/activateSubscription';
 import { createClient } from '@/lib/supabase/server';
 import { NextResponse } from 'next/server';
@@ -46,6 +47,11 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'Muitas tentativas. Tente novamente em breve.' }, { status: 429 });
   }
 
+  const consent = await requireCurrentConsent(supabase, user.id);
+  if (!consent.ok) {
+    return NextResponse.json({ error: consentReasonMessage(consent.reason!) }, { status: 403 });
+  }
+
   const { planInterval = 'monthly' } = await req.json().catch(() => ({})) as { planInterval?: PlanInterval };
   if (!STRIPE_INTERVALS[planInterval]) return NextResponse.json({ error: 'Plano inválido' }, { status: 400 });
 
@@ -76,8 +82,13 @@ export async function POST(req: Request) {
     const price = await getOrCreatePrice(planInterval);
 
     const session = await stripe.checkout.sessions.create({
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      ui_mode: 'embedded_page' as any,
+      // Verificado contra o SDK instalado (stripe@22.0.2): o tipo real
+      // de ui_mode é 'elements' | 'embedded_page' | 'form' | 'hosted_page'
+      // (nomenclatura desta API version), não 'hosted'|'embedded'|'custom'
+      // como em versões/documentações mais antigas. 'embedded_page' já
+      // era o valor certo — só removido o `as any` que escondia isso do
+      // type-check sem necessidade.
+      ui_mode: 'embedded_page',
       mode: 'subscription',
       customer: customer.id,
       line_items: [{ price: price.id, quantity: 1 }],

@@ -1,6 +1,8 @@
 import { getStripe } from '@/lib/stripe/client';
+import { requireSupabaseSuccess } from '@/lib/supabaseErrors';
 import { createClient } from '@/lib/supabase/server';
 import { createServiceClient } from '@/lib/supabase/service';
+import { isRecurringSubscriptionRow } from '@/lib/subscriptionTypes';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 
@@ -78,21 +80,27 @@ export async function POST(req: Request) {
   // não só a mais recente.
   await markRequest('canceling_subscriptions');
 
-  const { data: activeSubs } = await service
+  // Não confia só em payment_type='subscription' (já foi gravado
+  // errado uma vez para assinaturas Stripe — ver
+  // src/lib/subscriptionTypes.ts e migration 021). Busca todas as
+  // linhas ativas do Stripe e filtra em código com a mesma defesa em
+  // profundidade usada no cancelamento.
+  const { data: activeStripeRows } = await service
     .from('subscriptions')
-    .select('id, provider_subscription_id')
+    .select('id, provider, provider_subscription_id, payment_type')
     .eq('user_id', user.id)
     .eq('provider', 'stripe')
-    .eq('status', 'active')
-    .eq('payment_type', 'subscription');
+    .eq('status', 'active');
 
-  if (activeSubs && activeSubs.length > 0) {
+  const activeSubs = (activeStripeRows ?? []).filter(isRecurringSubscriptionRow);
+
+  if (activeSubs.length > 0) {
     const stripe = getStripe();
     for (const sub of activeSubs) {
       if (!sub.provider_subscription_id) continue;
       try {
         await stripe.subscriptions.cancel(sub.provider_subscription_id);
-        await service.from('subscriptions').update({ status: 'canceled', canceled_at: new Date().toISOString() }).eq('id', sub.id);
+        await requireSupabaseSuccess(service.from('subscriptions').update({ status: 'canceled', canceled_at: new Date().toISOString() }).eq('id', sub.id));
       } catch (err) {
         const message = `Falha ao cancelar assinatura Stripe antes de excluir a conta: ${(err as Error).message}`;
         console.error('[account/delete]', message);
@@ -112,18 +120,25 @@ export async function POST(req: Request) {
 
   // Passo 2: apaga objetos do Storage, paginando de verdade (sem
   // limite silencioso de 1000) e checando erros de list/remove.
+  //
+  // BUG CONFIRMADO (round 3): a versão anterior incrementava `offset`
+  // a cada página REMOVIDA. Como list() reflete o estado atual do
+  // bucket, remover a primeira página de 1000 arquivos faz os itens
+  // que estavam nas posições 1000-1999 descerem para 0-999 — pedir
+  // offset=1000 na próxima volta pula exatamente esse lote, que nunca
+  // é apagado. A partir de agora sempre lista a partir de offset:0,
+  // porque os arquivos já removidos somem da listagem.
   await markRequest('deleting_storage');
   const storageIssues: string[] = [];
 
   try {
-    let offset = 0;
     for (;;) {
       const { data: files, error: listError } = await service.storage
         .from('meal-photos')
-        .list(user.id, { limit: STORAGE_PAGE_SIZE, offset });
+        .list(user.id, { limit: STORAGE_PAGE_SIZE, offset: 0 });
 
       if (listError) {
-        storageIssues.push(`list offset=${offset}: ${listError.message}`);
+        storageIssues.push(`list: ${listError.message}`);
         break;
       }
       if (!files || files.length === 0) break;
@@ -131,20 +146,37 @@ export async function POST(req: Request) {
       const paths = files.map((f) => `${user.id}/${f.name}`);
       const { error: removeError } = await service.storage.from('meal-photos').remove(paths);
       if (removeError) {
-        storageIssues.push(`remove offset=${offset}: ${removeError.message}`);
+        // Não continua o loop se remove() está falhando — sem os
+        // arquivos saírem da listagem, offset:0 repetiria a mesma
+        // página pra sempre.
+        storageIssues.push(`remove: ${removeError.message}`);
+        break;
       }
 
       if (files.length < STORAGE_PAGE_SIZE) break;
-      offset += STORAGE_PAGE_SIZE;
     }
   } catch (err) {
     storageIssues.push(String((err as Error)?.message ?? err));
   }
 
   if (storageIssues.length > 0) {
-    // Não bloqueia a exclusão (diferente de uma cobrança ainda ativa),
-    // mas fica registrado — não é silenciosamente ignorado.
-    console.error('[account/delete] problemas ao limpar Storage:', storageIssues.join(' | '));
+    // BLOQUEIA a exclusão (round 3): deixar fotos órfãs no Storage
+    // enquanto a conta e todos os outros dados somem é uma promessa de
+    // retenção de dados quebrada — o usuário acha que apagou tudo, mas
+    // as imagens continuam lá. Mesmo tratamento que falha de
+    // cancelamento de assinatura: para aqui, fica retomável.
+    const message = storageIssues.join(' | ');
+    console.error('[account/delete] problemas ao limpar Storage — exclusão NÃO concluída:', message);
+    await markRequest('failed', `storage: ${message}`);
+    return NextResponse.json(
+      {
+        error:
+          'Não foi possível remover todos os seus arquivos armazenados. ' +
+          'Sua conta NÃO foi excluída para não deixar dados órfãos. ' +
+          'Tente novamente em alguns minutos ou contate o suporte.',
+      },
+      { status: 502 },
+    );
   }
 
   // Passo 3: apaga o usuário — dispara os CASCADEs no banco.

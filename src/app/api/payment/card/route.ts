@@ -1,7 +1,9 @@
 import { getPayment, PLANS, type PlanInterval } from '@/lib/mercadopago/client';
 import { checkDistributedRateLimit } from '@/lib/distributedRateLimit';
+import { consentReasonMessage, requireCurrentConsent } from '@/lib/consentCheck';
 import { createClient } from '@/lib/supabase/server';
 import { createServiceClient } from '@/lib/supabase/service';
+import { requireSupabaseSuccess } from '@/lib/supabaseErrors';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 
@@ -29,6 +31,11 @@ export async function POST(req: Request) {
   // Rate limit distribuído: 10 tentativas de cobrança por hora por usuário
   if (!(await checkDistributedRateLimit(`payment-card:${user.id}`, 10, 3600))) {
     return NextResponse.json({ error: 'Muitas tentativas. Tente novamente em breve.' }, { status: 429 });
+  }
+
+  const consent = await requireCurrentConsent(supabase, user.id);
+  if (!consent.ok) {
+    return NextResponse.json({ error: consentReasonMessage(consent.reason!) }, { status: 403 });
   }
 
   const json = await req.json().catch(() => ({}));
@@ -107,13 +114,15 @@ export async function POST(req: Request) {
       // 007_normalize_subscriptions.sql e 005_security_hardening.sql.
       const service = createServiceClient();
 
-      await service.from('subscriptions').upsert(
+      await requireSupabaseSuccess(service.from('subscriptions').upsert(
         {
           user_id: user.id,
           plan: 'pro',
           mp_subscription_id: String(result.id),
           mp_status: 'authorized',
-          payment_type: 'card',
+          // 'one_time_card': cartão avulso do MP, não confundir com
+          // assinatura recorrente — ver src/lib/subscriptionTypes.ts.
+          payment_type: 'one_time_card',
           expires_at: expiresAt.toISOString(),
           provider: 'mercadopago',
           provider_subscription_id: String(result.id),
@@ -125,9 +134,9 @@ export async function POST(req: Request) {
           canceled_at: null,
         },
         { onConflict: 'mp_subscription_id' }
-      );
+      ));
 
-      await service.from('profiles').update({ plan: 'pro' }).eq('id', user.id);
+      await requireSupabaseSuccess(service.from('profiles').update({ plan: 'pro' }).eq('id', user.id));
     }
 
     const rejectionMessages: Record<string, string> = {

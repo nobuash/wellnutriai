@@ -1,5 +1,6 @@
 import { getPreference, PLANS, type PlanInterval } from '@/lib/mercadopago/client';
 import { checkDistributedRateLimit } from '@/lib/distributedRateLimit';
+import { consentReasonMessage, requireCurrentConsent } from '@/lib/consentCheck';
 import { createClient } from '@/lib/supabase/server';
 import { NextResponse } from 'next/server';
 
@@ -16,6 +17,14 @@ export async function POST(req: Request) {
   // Rate limit distribuído: 10 tentativas por hora por usuário
   if (!(await checkDistributedRateLimit(`payment-subscribe:${user.id}`, 10, 3600))) {
     return NextResponse.json({ error: 'Muitas tentativas. Tente novamente em breve.' }, { status: 429 });
+  }
+
+  // Consentimento atual é exigido para INICIAR uma nova cobrança — mas
+  // nunca para cancelar uma existente (ver src/app/api/payment/cancel,
+  // que não tem esta checagem de propósito).
+  const consent = await requireCurrentConsent(supabase, user.id);
+  if (!consent.ok) {
+    return NextResponse.json({ error: consentReasonMessage(consent.reason!) }, { status: 403 });
   }
 
   const body = await req.json().catch(() => ({})) as { planInterval?: string };
