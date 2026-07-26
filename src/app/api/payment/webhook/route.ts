@@ -85,6 +85,14 @@ export async function POST(req: NextRequest) {
             mp_status: 'authorized',
             payment_type: paymentType,
             expires_at: expiresAt.toISOString(),
+            provider: 'mercadopago',
+            provider_subscription_id: String(payment.id),
+            provider_payment_id: String(payment.id),
+            status: 'active',
+            billing_interval: planInterval,
+            current_period_end: expiresAt.toISOString(),
+            cancel_at_period_end: false,
+            canceled_at: null,
           },
           { onConflict: 'mp_subscription_id' }
         );
@@ -104,6 +112,11 @@ export async function POST(req: NextRequest) {
       const userId = sub.external_reference as string;
       const mpStatus = sub.status as string;
       const newPlan = mpStatus === 'authorized' ? 'pro' : 'free';
+      const nextPaymentDate = (sub.auto_recurring as Record<string, string> | undefined)?.end_date ?? null;
+      const normalizedStatus =
+        mpStatus === 'authorized' ? 'active' :
+        mpStatus === 'cancelled' ? 'canceled' :
+        mpStatus === 'paused' ? 'past_due' : 'pending';
 
       await supabase.from('subscriptions').upsert(
         {
@@ -111,8 +124,13 @@ export async function POST(req: NextRequest) {
           plan: newPlan,
           mp_subscription_id: sub.id,
           mp_status: mpStatus,
-          next_payment_date: (sub.auto_recurring as Record<string, string> | undefined)?.end_date ?? null,
+          next_payment_date: nextPaymentDate,
           payment_type: 'subscription',
+          provider: 'mercadopago',
+          provider_subscription_id: sub.id,
+          status: normalizedStatus,
+          current_period_end: nextPaymentDate,
+          canceled_at: mpStatus === 'cancelled' ? new Date().toISOString() : null,
         },
         { onConflict: 'mp_subscription_id' }
       );

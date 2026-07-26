@@ -125,7 +125,7 @@ export default function LandingPage() {
             name="Pro"
             price="R$ 29,90/mês"
             desc="Experiência completa"
-            features={['Planos ilimitados e editáveis', 'Chat completo', 'Análise por foto', 'Suporte prioritário']}
+            features={['Até 6 planos alimentares por mês', 'Chat com IA de uso amplo', 'Até 30 análises de refeição por mês', 'Suporte prioritário']}
             cta="Assinar Pro"
             ctaHref="/signup"
           />

@@ -1,5 +1,7 @@
 import { getPayment, PLANS, type PlanInterval } from '@/lib/mercadopago/client';
+import { checkDistributedRateLimit } from '@/lib/distributedRateLimit';
 import { createClient } from '@/lib/supabase/server';
+import { createServiceClient } from '@/lib/supabase/service';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 
@@ -23,6 +25,11 @@ export async function POST(req: Request) {
   const supabase = createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: 'Não autenticado' }, { status: 401 });
+
+  // Rate limit distribuído: 10 tentativas de cobrança por hora por usuário
+  if (!(await checkDistributedRateLimit(supabase, `payment-card:${user.id}`, 10, 3600))) {
+    return NextResponse.json({ error: 'Muitas tentativas. Tente novamente em breve.' }, { status: 429 });
+  }
 
   const json = await req.json().catch(() => ({}));
   const parsed = bodySchema.safeParse(json);
@@ -95,7 +102,12 @@ export async function POST(req: Request) {
       const expiresAt = new Date();
       expiresAt.setDate(expiresAt.getDate() + durationDays);
 
-      await supabase.from('subscriptions').upsert(
+      // subscriptions e profiles.plan só aceitam escrita via
+      // service_role (RLS + trigger protect_plan_column) — ver
+      // 007_normalize_subscriptions.sql e 005_security_hardening.sql.
+      const service = createServiceClient();
+
+      await service.from('subscriptions').upsert(
         {
           user_id: user.id,
           plan: 'pro',
@@ -103,11 +115,19 @@ export async function POST(req: Request) {
           mp_status: 'authorized',
           payment_type: 'card',
           expires_at: expiresAt.toISOString(),
+          provider: 'mercadopago',
+          provider_subscription_id: String(result.id),
+          provider_payment_id: String(result.id),
+          status: 'active',
+          billing_interval: planInterval,
+          current_period_end: expiresAt.toISOString(),
+          cancel_at_period_end: false,
+          canceled_at: null,
         },
         { onConflict: 'mp_subscription_id' }
       );
 
-      await supabase.from('profiles').update({ plan: 'pro' }).eq('id', user.id);
+      await service.from('profiles').update({ plan: 'pro' }).eq('id', user.id);
     }
 
     const rejectionMessages: Record<string, string> = {

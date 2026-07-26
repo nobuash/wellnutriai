@@ -5,7 +5,8 @@ import { Card } from '@/components/ui/Card';
 import { StripeCardModal } from '@/components/StripeCardModal';
 import { PLANS, type PlanInterval } from '@/lib/mercadopago/client';
 import { createClient } from '@/lib/supabase/client';
-import { useQuery, useMutation } from '@tanstack/react-query';
+import type { Entitlement } from '@/lib/entitlement';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { AlertCircle, Check, Copy, CreditCard, QrCode, Sparkles, X } from 'lucide-react';
 import Image from 'next/image';
 import { useState, useEffect, useRef } from 'react';
@@ -31,9 +32,11 @@ function formatBRL(value: number) {
 export default function PricingPage() {
   const supabase = createClient();
   const router = useRouter();
+  const qc = useQueryClient();
   const [pixData, setPixData] = useState<PixData | null>(null);
   const [selectedInterval, setSelectedInterval] = useState<PlanInterval>('annual');
   const [showCardModal, setShowCardModal] = useState(false);
+  const [confirmingCancel, setConfirmingCancel] = useState(false);
 
   // Ativa plano após retorno do Stripe Checkout
   useEffect(() => {
@@ -73,24 +76,37 @@ export default function PricingPage() {
     },
   });
 
-  const { data: activeSub } = useQuery({
-    queryKey: ['active-subscription'],
+  const { data: entitlement } = useQuery({
+    queryKey: ['entitlement'],
     queryFn: async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return null;
-      const { data } = await supabase
-        .from('subscriptions')
-        .select('mp_subscription_id, mp_status, next_payment_date, payment_type, expires_at')
-        .eq('user_id', user.id)
-        .eq('mp_status', 'authorized')
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .maybeSingle();
-      return data;
+      const res = await fetch('/api/entitlement');
+      if (!res.ok) return null;
+      return (await res.json()) as Entitlement;
     },
-    enabled: profile?.plan === 'pro',
   });
 
+  const cancelMutation = useMutation({
+    mutationFn: async () => {
+      const res = await fetch('/api/payment/cancel', { method: 'POST' });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? 'Erro ao cancelar');
+      return data as { ok: true; cancelAtPeriodEnd: boolean; accessUntil: string | null; alreadyCanceled?: boolean };
+    },
+    onSuccess: (data) => {
+      setConfirmingCancel(false);
+      qc.invalidateQueries({ queryKey: ['entitlement'] });
+      qc.invalidateQueries({ queryKey: ['profile'] });
+      if (data.cancelAtPeriodEnd && data.accessUntil) {
+        toast.success(`Renovação automática cancelada. Seu acesso PRO continua até ${new Date(data.accessUntil).toLocaleDateString('pt-BR')}.`);
+      } else {
+        toast.success('Assinatura cancelada.');
+      }
+    },
+    onError: (err: Error) => {
+      setConfirmingCancel(false);
+      toast.error(err.message);
+    },
+  });
 
   const pixMutation = useMutation({
     mutationFn: async (planInterval: PlanInterval) => {
@@ -106,8 +122,9 @@ export default function PricingPage() {
     onError: (err: Error) => toast.error(err.message),
   });
 
-  const currentPlan = profile?.plan ?? 'free';
-  const expiresAt = activeSub?.expires_at ? new Date(activeSub.expires_at) : null;
+  const currentPlan = entitlement?.isPro ? 'pro' : (profile?.plan ?? 'free');
+  const expiresAt = entitlement?.currentPeriodEnd ? new Date(entitlement.currentPeriodEnd) : null;
+  const isRecurring = entitlement?.provider === 'stripe' || entitlement?.paymentType === 'subscription';
 
   function copyPix() {
     if (!pixData?.qr_code) return;
@@ -128,7 +145,7 @@ export default function PricingPage() {
           <h3 className="font-bold text-lg mb-1">Free</h3>
           <p className="text-3xl font-bold mb-6">R$ 0</p>
           <ul className="space-y-2 mb-6">
-            {['1 plano alimentar por mês', 'Chat limitado (10 mensagens/dia)', 'Sem análise por foto'].map((f) => (
+            {['1 plano alimentar por mês', 'Sem chat com IA', 'Sem análise de refeição'].map((f) => (
               <li key={f} className="flex items-center gap-2 text-sm text-slate-700">
                 <Check className="h-4 w-4 text-brand-600 shrink-0" />{f}
               </li>
@@ -197,7 +214,7 @@ export default function PricingPage() {
           )}
 
           <ul className="space-y-2 mb-6 mt-4">
-            {['Planos ilimitados e editáveis', 'Chat IA sem limites', 'Análise por foto', 'Suporte prioritário'].map((f) => (
+            {['Até 6 planos alimentares por mês, editáveis pelo chat', 'Chat com IA — uso amplo, sujeito à política de uso justo', 'Até 30 análises de refeição por mês (foto ou manual)', 'Suporte prioritário'].map((f) => (
               <li key={f} className="flex items-center gap-2 text-sm text-slate-700">
                 <Check className="h-4 w-4 text-brand-600 shrink-0" />{f}
               </li>
@@ -235,12 +252,71 @@ export default function PricingPage() {
         </Card>
       </div>
 
+      {entitlement?.isPro && (
+        <Card>
+          <h3 className="font-bold mb-3">Sua assinatura</h3>
+          <div className="space-y-1 text-sm text-slate-600 mb-4">
+            <p>
+              Pagamento via{' '}
+              <strong>
+                {entitlement.provider === 'stripe' ? 'cartão (Stripe)' : entitlement.paymentType === 'pix' ? 'PIX' : 'cartão (Mercado Pago)'}
+              </strong>
+            </p>
+            {entitlement.cancelAtPeriodEnd ? (
+              <p className="text-amber-600">
+                Renovação automática cancelada — seu acesso PRO continua até{' '}
+                <strong>{expiresAt?.toLocaleDateString('pt-BR')}</strong>.
+              </p>
+            ) : isRecurring ? (
+              <p>
+                Renovação automática ativa. Próxima cobrança em{' '}
+                <strong>{expiresAt?.toLocaleDateString('pt-BR')}</strong>.
+              </p>
+            ) : (
+              <p>
+                Sem renovação automática. Acesso válido até{' '}
+                <strong>{expiresAt?.toLocaleDateString('pt-BR')}</strong> — para continuar, faça um novo pagamento.
+              </p>
+            )}
+          </div>
+
+          {isRecurring && !entitlement.cancelAtPeriodEnd && (
+            confirmingCancel ? (
+              <div className="rounded-lg border border-red-200 bg-red-50 p-4 space-y-3">
+                <p className="text-sm text-red-700">
+                  Tem certeza? A renovação automática será cancelada, mas você mantém acesso PRO até{' '}
+                  {expiresAt?.toLocaleDateString('pt-BR')}.
+                </p>
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    className="flex-1"
+                    loading={cancelMutation.isPending}
+                    onClick={() => cancelMutation.mutate()}
+                  >
+                    Confirmar cancelamento
+                  </Button>
+                  <Button variant="ghost" className="flex-1" onClick={() => setConfirmingCancel(false)}>
+                    Voltar
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <Button variant="outline" onClick={() => setConfirmingCancel(true)}>
+                Cancelar renovação automática
+              </Button>
+            )
+          )}
+        </Card>
+      )}
+
       <Card className="bg-slate-50 border-slate-200">
         <div className="flex gap-3 items-start text-sm text-slate-600">
           <AlertCircle className="h-4 w-4 shrink-0 mt-0.5 text-slate-400" />
           <p>
-            O pagamento é processado com segurança pelo <strong>Mercado Pago</strong>.
-            Não armazenamos dados do seu cartão. O PIX ativa o PRO pelo período escolhido e pode ser renovado a qualquer momento.
+            O pagamento é processado com segurança pelo <strong>Mercado Pago</strong> ou pela{' '}
+            <strong>Stripe</strong> (cartão internacional). Não armazenamos dados do seu cartão. O PIX ativa
+            o PRO pelo período escolhido e pode ser renovado a qualquer momento.
           </p>
         </div>
       </Card>

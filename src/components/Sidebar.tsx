@@ -4,7 +4,7 @@ import { cn } from '@/lib/utils';
 import { createClient } from '@/lib/supabase/client';
 import {
   Camera, ClipboardList, HeadphonesIcon, LayoutDashboard, LogOut,
-  MessageCircle, Smartphone, Sparkles, Utensils, X,
+  MessageCircle, Smartphone, Sparkles, User, Utensils, X,
 } from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
@@ -19,6 +19,7 @@ const nav = [
   { href: '/photo-analysis', label: 'Análise por Foto', icon: Camera, pro: true },
   { href: '/install-app', label: 'Instalar no celular', icon: Smartphone },
   { href: '/support', label: 'Suporte', icon: HeadphonesIcon },
+  { href: '/account', label: 'Minha conta', icon: User },
 ];
 
 interface SidebarProps {
@@ -99,7 +100,7 @@ export function Sidebar({ plan, name, isOpen, onClose }: SidebarProps) {
               <Sparkles className="h-4 w-4" />
               <span className="font-semibold text-sm">Upgrade para PRO</span>
             </div>
-            <p className="text-xs text-brand-50 mb-3">Planos ilimitados e análise por foto.</p>
+            <p className="text-xs text-brand-50 mb-3">Mais planos por mês, chat com IA e análise de refeição.</p>
             <Link
               href="/pricing"
               onClick={onClose}
