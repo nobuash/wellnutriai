@@ -1,28 +1,52 @@
-# Checklist de deploy — branch `fix/production-hardening`
+# Checklist de deploy — hardening de produção (rounds 1 e 2)
 
-Este checklist é para o merge desta branch em produção. Siga na ordem —
-as migrations do Supabase precisam rodar **antes** do deploy do código
-que depende delas.
+Este checklist é para o merge de `fix/production-hardening` (round 1) e
+`fix/production-hardening-round-2` em produção. Siga na ordem — as
+migrations do Supabase precisam rodar **antes** do deploy do código que
+depende delas.
 
 ## 1. Banco de dados (Supabase SQL Editor, em ordem)
 
-Rode cada arquivo de `supabase/migrations/007_*.sql` até `012_*.sql` (as
+Rode cada arquivo de `supabase/migrations/007_*.sql` até `020_*.sql` (as
 `001`–`006` já devem estar aplicadas em produção). Todas são idempotentes
-(`IF NOT EXISTS` / `DROP POLICY IF EXISTS` antes de recriar) e seguras
-para rodar contra o banco existente:
+(`IF NOT EXISTS` / `DROP POLICY IF EXISTS` antes de recriar, ou
+`NOT VALID` + validação best-effort quando pode haver dado antigo
+divergente) e seguras para rodar contra o banco existente:
 
+**Round 1:**
 - `007_normalize_subscriptions.sql` — **inclui uma mudança de RLS que
-  bloqueia escrita de usuário comum em `subscriptions`**. Confirme que
-  nenhuma outra rota (fora das já corrigidas nesta branch) escreve em
-  `subscriptions` usando o client autenticado do usuário antes de aplicar
-  em produção.
+  bloqueia escrita de usuário comum em `subscriptions`**.
 - `008_terms_consent.sql`
 - `009_minimum_age.sql` — pode logar `NOTICE` se já existirem
-  questionários com idade < 18; não falha a migration, mas revise
-  manualmente depois (query no comentário do arquivo).
+  questionários com idade < 18; não falha a migration.
 - `010_ai_usage_and_quotas.sql`
 - `011_distributed_rate_limit.sql`
 - `012_document_water_logs.sql`
+
+**Round 2:**
+- `013_lock_down_security_definer_rpcs.sql` — revoga `consume_usage_quota`
+  e `check_rate_limit` de `authenticated`, só `service_role` pode chamar
+  a partir daqui. Confirme que o código deployado já usa o service
+  client pra essas RPCs (já corrigido nesta branch) antes de rodar em
+  produção, ou as cotas/rate limits do código antigo param de funcionar.
+- `014_secure_consent_columns.sql`
+- `015_webhook_events.sql` — nova tabela; `processed_webhooks` (antiga)
+  não é mais escrita pelo código, mas não foi removida.
+- `016_subscription_integrity.sql` — cria um índice único condicional;
+  se já existirem duplicidades (dois registros `active`+`subscription`
+  pro mesmo usuário/provedor), a migration **pula a criação do índice**
+  e avisa via `NOTICE` em vez de falhar — rode a query do comentário do
+  arquivo pra revisar manualmente nesse caso.
+- `017_restrict_server_generated_tables.sql` — **RLS trava escrita de
+  usuário comum em `meal_plans`, `chat_messages`, `meal_photo_analysis`
+  e `nutrition_questionnaires`**. Mesmo alerta do `007`: confirme que o
+  código deployado já escreve nessas tabelas via service role antes de
+  rodar isso em produção.
+- `018_questionnaire_and_content_constraints.sql`
+- `019_expand_medical_screening.sql` — novas colunas em
+  `nutrition_questionnaires`, todas com default `false`/`null`, não
+  quebra questionários existentes.
+- `020_account_deletion_requests.sql`
 
 ## 2. Variáveis de ambiente (Vercel)
 
@@ -53,27 +77,39 @@ credenciais continuam os mesmos.
 
 ## 5. Deploy do código
 
-- Merge `fix/production-hardening` → `main`.
+- Merge `fix/production-hardening` e `fix/production-hardening-round-2` → `main`, nessa ordem.
 - Deploy automático (Vercel) ou manual, como já configurado no projeto.
 
 ## 6. Verificação pós-deploy (smoke test manual)
 
-- [ ] Cadastro + aceite de termos → `profiles.accepted_terms_at` fica
-      preenchido (antes ficava `NULL` para sempre — bug corrigido nesta
-      branch).
-- [ ] Gerar plano alimentar com um perfil **sem** diabetes → funciona
-      normalmente.
-- [ ] Gerar plano com diabetes marcado no questionário → recebe a
-      mensagem de restrição, não um plano.
-- [ ] Pagar via PIX (valor de teste) → `subscriptions.status = 'active'`,
-      acesso PRO liberado.
-- [ ] Pagar via Stripe (cartão de teste) → assinatura ativa, `/pricing`
-      mostra "renovação automática ativa" com a próxima data de cobrança.
-- [ ] Cancelar assinatura Stripe pela UI → confirma no Stripe Dashboard
-      que `cancel_at_period_end` ficou `true` na assinatura real (não só
-      no nosso banco).
-- [ ] `/account` → excluir conta de teste → confirma que o usuário some
-      do Supabase Auth e as fotos somem do bucket `meal-photos`.
+**Round 1:**
+- [ ] Cadastro + aceite de termos → `profiles.accepted_terms_at` fica preenchido.
+- [ ] Gerar plano com diabetes marcado no questionário → recebe a mensagem de restrição, não um plano.
+- [ ] Pagar via PIX (valor de teste) → `subscriptions.status = 'active'`, acesso PRO liberado.
+- [ ] Pagar via Stripe (cartão de teste) → assinatura ativa, `/pricing` mostra "renovação automática
+      ativa" com a próxima data de cobrança.
+- [ ] Cancelar assinatura Stripe pela UI → confirma no Stripe Dashboard que `cancel_at_period_end`
+      ficou `true` na assinatura real.
+
+**Round 2:**
+- [ ] Chamar `/api/payment/verify` duas vezes seguidas com o mesmo `payment_id` de um PIX aprovado
+      → `subscriptions.current_period_end` é **idêntico** nas duas chamadas (não avança).
+- [ ] No SQL Editor, tentar `select * from public.subscriptions where user_id = auth.uid()` autenticado
+      como um usuário comum funciona (leitura); tentar um `update`/`insert` na mesma tabela pelo
+      client SDK do navegador falha (RLS).
+- [ ] Mesmo teste de escrita bloqueada em `meal_plans`/`chat_messages`/`meal_photo_analysis`/
+      `nutrition_questionnaires` — só leitura deve funcionar.
+- [ ] Chamar `supabase.rpc('consume_usage_quota', {...})` autenticado como usuário comum retorna
+      erro de permissão (antes funcionava e aceitava `p_user_id` de outra pessoa).
+- [ ] Preencher o questionário marcando "gestação" ou "doença renal" → gera a mesma mensagem de
+      restrição médica que diabetes já gerava.
+- [ ] Assinar via Stripe e, com a assinatura ainda ativa, tentar assinar de novo → recebe erro
+      "Você já possui uma assinatura recorrente ativa" em vez de criar uma segunda.
+- [ ] Aceitar os termos, depois simular uma versão nova (`TERMS_VERSION` diferente temporariamente)
+      → `/account` e `/pricing` continuam acessíveis; `/dashboard` redireciona para `/accept-terms`.
+- [ ] `/account` → excluir conta de teste → confirma que o usuário some do Supabase Auth e as fotos
+      somem do bucket `meal-photos`; repetir com uma assinatura Stripe ativa e confirmar que, se o
+      cancelamento falhar (ex: chave de teste inválida), a conta **não** é apagada.
 
 ## Rollback
 
@@ -93,3 +129,10 @@ credenciais continuam os mesmos.
   (Não recomendado — isso reabre a falha de segurança documentada em
   `docs/production-hardening-audit.md`. Prefira sempre reverter só o
   código.)
+- O mesmo raciocínio vale para `017_restrict_server_generated_tables.sql`
+  (RLS de `meal_plans`/`chat_messages`/`meal_photo_analysis`/
+  `nutrition_questionnaires`) e `013_lock_down_security_definer_rpcs.sql`
+  (RPCs de cota/rate limit) — reverter o código para uma versão anterior
+  a estas migrations sem também reverter a migration correspondente
+  quebra a escrita nessas tabelas/funções. Prefira sempre reverter só o
+  código e manter as migrations aplicadas.

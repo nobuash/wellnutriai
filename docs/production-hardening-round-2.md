@@ -98,4 +98,57 @@ para apagar".
 
 ## Status de execução
 
-Ver seção final deste documento (atualizada ao final do trabalho) e commits desta branch.
+Legenda: 🟢 implementado e verificado (typecheck + lint + `npm run test` + build + smoke test local
+`next start`/curl — não é o mesmo que testado contra Stripe/Mercado Pago/Supabase de produção
+reais) · 🟡 implementado, exige configuração/ação externa · 🔴 não implementado · ⚪ risco residual
+documentado.
+
+| # | Item | Status |
+|---|---|---|
+| 1 | RPCs `SECURITY DEFINER` com parâmetros controlados pelo cliente | 🟢 revogado de `authenticated`, só `service_role` — `013_lock_down_security_definer_rpcs.sql` |
+| 2 | Bypass de consentimento (campos novos não protegidos) | 🟢 `protect_plan_column` estende proteção a `accepted_terms`/`terms_version`/`privacy_version`/`email` — `014_secure_consent_columns.sql` |
+| 3 | Replay de pagamento não determinístico (`verify`, `stripe/activate`) | 🟢 `evaluateMpPayment`/`activateStripeSubscription` usam datas reais do provedor, nunca `Date.now()` — testado em `activatePayment.test.ts` |
+| 4 | Idempotência de webhook (mark-before-complete + chave que bloqueia transição de status) | 🟢 `webhook_events` com ciclo received/processing/processed/failed — `015_webhook_events.sql`, `webhookIdempotency.ts` |
+| 5 | Entitlement só olha a assinatura mais recente | 🟢 `selectEntitlement()` analisa todas, testado com as combinações do critério de aceite |
+| 6 | Duas assinaturas Stripe simultâneas | 🟢 checado antes do checkout (`findActiveStripeSubscription`) + índice único parcial no banco — `016_subscription_integrity.sql` |
+| 7 | RLS permite escrita direta em `meal_plans`/`chat_messages`/`meal_photo_analysis`/questionário | 🟢 travado, só `service_role` — `017_restrict_server_generated_tables.sql`; `POST /api/questionnaire` substitui o insert direto |
+| 8 | Limites de conteúdo no banco (questionário, chat, plano) | 🟢 `018_questionnaire_and_content_constraints.sql` (NOT VALID + validação best-effort) |
+| 9 | Exclusão de conta apaga mesmo com falha no cancelamento Stripe | 🟢 bloqueia a exclusão nesse caso; cancela **todas** as assinaturas ativas, não só a mais recente; pagina Storage sem limite de 1000 — `020_account_deletion_requests.sql` |
+| 10 | Consentimento sem checar versão nas APIs sensíveis | 🟢 `requireCurrentConsent()`/`evaluateConsent()` centralizados, testado, aplicado em plano/chat/foto/questionário |
+| 11 | Acesso a `/account`, `/pricing`, `/support` bloqueado por termos desatualizados | 🟢 corrigido via header `x-pathname` + allowlist no layout |
+| 12 | Triagem médica limitada a `diabetes_type` | 🟢 expandida (gestação, amamentação, doença renal/hepática, transtorno alimentar, alergia severa, insulina, texto livre) — `019_expand_medical_screening.sql` |
+| 13 | Rate limit só em memória em chat/plano/foto/suporte | 🟢 `checkDistributedRateLimit` adicionado a todas (foto manual não tinha rate limit nenhum) |
+| 14 | Sem testes automatizados | 🟢 Vitest configurado, 46 testes unitários cobrindo entitlement, replay de pagamento, consentimento, alergia/triagem médica, validação — sem integração/E2E (ver risco residual) |
+| 15 | Next.js desatualizado | 🟡 já corrigido no round 1 (14.2.13→14.2.35, fechou CVE crítico); migração para 15/16 **não feita nesta rodada** — ver risco residual |
+| 16 | Pipeline de fotos (upload direto ao Storage, jobs assíncronos, EXIF) | 🔴 não implementado — continua fluxo síncrono via corpo da função, base64 pra Vision. Ver risco residual |
+| 17 | Cloudflare Turnstile no cadastro | 🔴 não implementado — mesmo estado do round 1 (pacote instalado, zero uso) |
+| 18 | Observabilidade (Sentry) | 🔴 não implementado |
+| 19 | Agregação de custo de IA no banco (RPC reserve/commit) | 🔴 não implementado — `checkDailyAiBudget`/`checkUserMonthlyBudget` continuam somando linhas no Node (`ai_usage_logs`), não com `SUM()` no Postgres. Funciona no volume atual, não escala bem |
+| 20 | Cálculo calórico determinístico fora da IA | 🔴 não implementado — a IA continua calculando calorias/macros dentro do prompt. Motivo: Mifflin-St Jeor precisa de sexo biológico, que o questionário não coleta; resolver isso direito exige adicionar o campo (migração de schema + UI + termos) ou adotar uma fórmula substituta, e validar a mudança com cuidado — não é um ajuste pequeno o suficiente pra encaixar com segurança no fim desta rodada já grande |
+| 21 | Preconfigurar Product/Price da Stripe via env var | 🔴 não implementado — `stripe/intent/route.ts` continua buscando/criando dinamicamente |
+| 22 | Páginas jurídicas públicas (`/terms`, `/privacy`, `/fair-use` etc.) | 🔴 não implementado — exigiria redigir texto legal real, o que não deveria ser gerado sem revisão jurídica |
+| 23 | Jobs de limpeza periódica (rate limits antigos, webhooks processados) | 🔴 não implementado — nenhum cron configurado ainda |
+| 24 | Cancelamento de assinatura recorrente do Mercado Pago na exclusão de conta | ⚪ não adicionado — `preapproval` do MP continua sendo código morto (nenhum fluxo cria uma de verdade, confirmado nas duas rodadas), então não há o que cancelar hoje; o caminho de cancelamento via `getPreApproval().update()` já existe em `/api/payment/cancel` para quando isso mudar |
+
+### O que foi verificado de verdade nesta rodada
+
+- `npm run type-check`, `npm run lint`, `npm run test` (46/46), `npm run build`: todos passando.
+- `npm audit`: 0 crítico (36 vulnerabilidades, majoritariamente exigindo migração para Next 15/16 —
+  mesmo estado documentado no round 1).
+- Smoke test local (`next start` + curl): landing, login, redirecionamento de rotas protegidas sem
+  sessão, `/account`/`/pricing` redirecionando por falta de sessão (não por termos desatualizados),
+  `401` correto em `/api/entitlement`, `405` correto em `GET /api/questionnaire`.
+- **Não testado**: nenhum fluxo real contra Stripe/Mercado Pago/Supabase de produção ou sandbox
+  nesta sessão — as migrations `013`–`020` ainda não rodaram em produção (ver
+  `docs/deployment-checklist.md`, que precisa ser atualizado com a nova ordem antes do deploy).
+
+### Riscos residuais que exigem decisão do mantenedor
+
+- Rodar as migrations `013`–`020` em produção **antes** do deploy do código (mesma regra do round
+  1 — o código novo espera as tabelas/colunas/policies novas).
+- Migração para Next.js 15/16 continua pendente — os avisos restantes do `npm audit` só fecham com
+  isso; é um esforço à parte, não emendado aqui de propósito.
+- Reformular o pipeline de fotos (upload direto, jobs assíncronos) é a maior peça de P1 não feita —
+  hoje a imagem ainda passa pelo corpo da function e vira base64 antes de ir pra Vision API.
+- Cálculo calórico segue dentro do prompt da IA, não determinístico no backend — ver item 20 acima.
+- Turnstile e Sentry seguem exigindo criação de conta nos respectivos serviços.
