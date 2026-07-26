@@ -23,16 +23,12 @@ export default function AcceptTermsPage() {
       return;
     }
 
-    // Atualiza o banco e os metadados do JWT ao mesmo tempo
-    const [{ error }, { error: metaError }] = await Promise.all([
-      supabase.from('profiles').update({
-        accepted_terms: true,
-        accepted_terms_at: new Date().toISOString(),
-      }).eq('id', user.id),
-      supabase.auth.updateUser({ data: { accepted_terms: true } }),
-    ]);
+    // O aceite é gravado pelo servidor (service role), que é a única
+    // forma de o campo accepted_terms_at ser persistido de verdade —
+    // ver /api/accept-terms e docs/production-hardening-audit.md.
+    const res = await fetch('/api/accept-terms', { method: 'POST' });
 
-    if (error || metaError) {
+    if (!res.ok) {
       toast.error('Erro ao registrar aceite');
       setLoading(false);
       return;
