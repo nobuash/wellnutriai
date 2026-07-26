@@ -1,12 +1,73 @@
 /** @type {import('next').NextConfig} */
+// PWA/service worker cache. A maior parte do app é autenticada e lida com
+// dados de saúde (planos alimentares, chat, análises de refeição) — o
+// service worker NUNCA pode servir isso do cache para outra sessão no
+// mesmo aparelho (ex: dois usuários no mesmo computador/celular). Por
+// isso runtimeCaching abaixo é NetworkOnly para tudo que não seja
+// asset estático do próprio build. cacheOnFrontEndNav/aggressiveFrontEndNavCaching
+// (que cacheiam navegações client-side do App Router) foram removidos de
+// propósito — eram exatamente o tipo de cache que este app não pode ter.
 const withPWA = require('@ducanh2912/next-pwa').default({
   dest: 'public',
-  cacheOnFrontEndNav: true,
-  aggressiveFrontEndNavCaching: true,
   reloadOnOnline: true,
   disable: process.env.NODE_ENV === 'development',
   workboxOptions: {
     disableDevLogs: true,
+    runtimeCaching: [
+      {
+        urlPattern: /^https:\/\/fonts\.(?:gstatic)\.com\/.*/i,
+        handler: 'CacheFirst',
+        options: {
+          cacheName: 'google-fonts-webfonts',
+          expiration: { maxEntries: 4, maxAgeSeconds: 365 * 24 * 60 * 60 },
+        },
+      },
+      {
+        urlPattern: /\/_next\/static.+\.js$/i,
+        handler: 'CacheFirst',
+        options: {
+          cacheName: 'next-static-js-assets',
+          expiration: { maxEntries: 64, maxAgeSeconds: 24 * 60 * 60 },
+        },
+      },
+      {
+        urlPattern: /\.(?:js|css)$/i,
+        handler: 'StaleWhileRevalidate',
+        options: {
+          cacheName: 'static-js-css',
+          expiration: { maxEntries: 64, maxAgeSeconds: 24 * 60 * 60 },
+        },
+      },
+      {
+        // Só ícones/imagens estáticas do próprio app (logo, ícones do
+        // manifest) — nunca fotos de refeição do usuário nem qualquer
+        // URL do Supabase Storage.
+        urlPattern: ({ url, sameOrigin }) =>
+          sameOrigin && /\.(?:png|svg|ico|webp)$/i.test(url.pathname) && !url.pathname.startsWith('/storage'),
+        handler: 'StaleWhileRevalidate',
+        options: {
+          cacheName: 'static-images',
+          expiration: { maxEntries: 64, maxAgeSeconds: 30 * 24 * 60 * 60 },
+        },
+      },
+      {
+        // Nunca cachear respostas de API — podem conter dados pessoais/de saúde.
+        urlPattern: ({ url }) => url.pathname.startsWith('/api/'),
+        handler: 'NetworkOnly',
+      },
+      {
+        // Nunca cachear navegação de página (nem full load, nem transição
+        // client-side do App Router, identificada pelo header RSC).
+        urlPattern: ({ request, sameOrigin }) =>
+          sameOrigin && (request.mode === 'navigate' || request.headers.get('RSC') === '1'),
+        handler: 'NetworkOnly',
+      },
+      {
+        // Fallback: qualquer outra coisa same-origin não coberta acima.
+        urlPattern: ({ sameOrigin }) => sameOrigin,
+        handler: 'NetworkOnly',
+      },
+    ],
   },
 });
 
