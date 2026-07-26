@@ -8,6 +8,17 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    env:
+      # Valores fictícios só para next.config.js não travar (ele valida env
+      # obrigatória, e tanto `next lint` quanto `next build` carregam esse
+      # arquivo). Chamadas reais à OpenAI/Stripe/Mercado Pago não acontecem
+      # em build/lint time, só em runtime. Nunca aponte isso para um
+      # projeto Supabase real.
+      NEXT_PUBLIC_SUPABASE_URL: https://ci-placeholder.supabase.co
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ci-placeholder-anon-key
+      SUPABASE_SERVICE_ROLE_KEY: ci-placeholder-service-role-key
+      OPENAI_API_KEY: sk-ci-placeholder
+      NEXT_PUBLIC_APP_URL: http://localhost:3000
     steps:
       - uses: actions/checkout@v4
 
@@ -27,16 +38,6 @@ jobs:
 
       - name: Build
         run: npm run build
-        env:
-          # Valores fictícios só para o build passar (validação de env
-          # obrigatória em next.config.js, chamadas reais à OpenAI/Stripe/
-          # Mercado Pago não acontecem em build time, só em runtime).
-          # Nunca aponte isso para um projeto Supabase real.
-          NEXT_PUBLIC_SUPABASE_URL: https://ci-placeholder.supabase.co
-          NEXT_PUBLIC_SUPABASE_ANON_KEY: ci-placeholder-anon-key
-          SUPABASE_SERVICE_ROLE_KEY: ci-placeholder-service-role-key
-          OPENAI_API_KEY: sk-ci-placeholder
-          NEXT_PUBLIC_APP_URL: http://localhost:3000
 
   # NOTA: não há testes automatizados neste repositório ainda (sem
   # Jest/Vitest/Playwright configurado — ver docs/production-hardening-audit.md).
