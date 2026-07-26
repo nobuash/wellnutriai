@@ -91,7 +91,7 @@ export async function POST(req: Request) {
   const mealPlanContent = (mealPlan?.content as MealPlanContent | undefined) ?? null;
 
   const isSimpleMessage = SIMPLE_MESSAGE_PATTERN.test(parsed.data.message.trim());
-  const knowledgeChunks = isSimpleMessage ? [] : await searchKnowledge(parsed.data.message);
+  const knowledgeChunks = isSimpleMessage ? [] : await searchKnowledge(parsed.data.message, 4, 0.55, user.id);
   const knowledgeContext = formatKnowledgeContext(knowledgeChunks);
 
   const systemPrompt = buildChatSystemPrompt(questionnaire, mealPlanContent, knowledgeContext);
@@ -127,7 +127,7 @@ export async function POST(req: Request) {
       ],
     });
 
-    void logAiUsage({
+    await logAiUsage({
       userId: user.id,
       feature: 'chat',
       model: MODELS.TEXT,
@@ -188,7 +188,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ reply, mealPlanUpdated });
   } catch (err) {
     console.error('[chat] error:', (err as Error).message);
-    void logAiUsage({
+    await logAiUsage({
       userId: user.id, feature: 'chat', model: MODELS.TEXT,
       inputTokens: 0, outputTokens: 0, status: 'error', latencyMs: Date.now() - startedAt,
     });
