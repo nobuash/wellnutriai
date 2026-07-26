@@ -11,6 +11,7 @@ import {
   mealPlanContentSchema,
 } from '@/lib/mealPlanSafety';
 import { requireCurrentConsent, consentReasonMessage } from '@/lib/consentCheck';
+import { checkDistributedRateLimit } from '@/lib/distributedRateLimit';
 import { rateLimit } from '@/lib/ratelimit';
 import { createClient } from '@/lib/supabase/server';
 import { createServiceClient } from '@/lib/supabase/service';
@@ -26,8 +27,11 @@ export async function POST() {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: 'Não autenticado' }, { status: 401 });
 
-  // Rate limit: 5 gerações por hora por usuário (burst protection local)
+  // Burst local (rápido) + distribuído (funciona entre instâncias Vercel).
   if (!rateLimit(`meal-plan:${user.id}`, 5, 3600)) {
+    return NextResponse.json({ error: 'Muitas requisições. Tente novamente em breve.' }, { status: 429 });
+  }
+  if (!(await checkDistributedRateLimit(`meal-plan:${user.id}`, 5, 3600))) {
     return NextResponse.json({ error: 'Muitas requisições. Tente novamente em breve.' }, { status: 429 });
   }
 

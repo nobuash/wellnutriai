@@ -5,6 +5,7 @@ import { getUserEntitlement } from '@/lib/entitlement';
 import { checkDailyAiBudget, checkUserMonthlyBudget, consumeUsageQuota, logAiUsage, monthKey } from '@/lib/aiUsage';
 import { photoAnalysisResultSchema } from '@/lib/photoAnalysisSchema';
 import { requireCurrentConsent, consentReasonMessage } from '@/lib/consentCheck';
+import { checkDistributedRateLimit } from '@/lib/distributedRateLimit';
 import { rateLimit } from '@/lib/ratelimit';
 import { createClient } from '@/lib/supabase/server';
 import { createServiceClient } from '@/lib/supabase/service';
@@ -44,8 +45,11 @@ export async function POST(req: Request) {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: 'Não autenticado' }, { status: 401 });
 
-  // Rate limit: 10 uploads por hora por usuário
+  // Burst local (rápido) + distribuído (funciona entre instâncias Vercel).
   if (!rateLimit(`photo:${user.id}`, 10, 3600)) {
+    return NextResponse.json({ error: 'Muitas requisições. Tente novamente em breve.' }, { status: 429 });
+  }
+  if (!(await checkDistributedRateLimit(`photo:${user.id}`, 10, 3600))) {
     return NextResponse.json({ error: 'Muitas requisições. Tente novamente em breve.' }, { status: 429 });
   }
 

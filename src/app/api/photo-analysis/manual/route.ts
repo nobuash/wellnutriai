@@ -5,6 +5,8 @@ import { getUserEntitlement } from '@/lib/entitlement';
 import { checkDailyAiBudget, checkUserMonthlyBudget, consumeUsageQuota, logAiUsage, monthKey } from '@/lib/aiUsage';
 import { photoAnalysisResultSchema } from '@/lib/photoAnalysisSchema';
 import { requireCurrentConsent, consentReasonMessage } from '@/lib/consentCheck';
+import { checkDistributedRateLimit } from '@/lib/distributedRateLimit';
+import { rateLimit } from '@/lib/ratelimit';
 import { createClient } from '@/lib/supabase/server';
 import { createServiceClient } from '@/lib/supabase/service';
 import { NextResponse } from 'next/server';
@@ -25,6 +27,15 @@ export async function POST(req: Request) {
 
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: 'Não autenticado' }, { status: 401 });
+
+  // Não existia rate limit nenhum nesta rota antes (burst local +
+  // distribuído, mesmo padrão das outras rotas de IA).
+  if (!rateLimit(`photo-manual:${user.id}`, 10, 3600)) {
+    return NextResponse.json({ error: 'Muitas requisições. Tente novamente em breve.' }, { status: 429 });
+  }
+  if (!(await checkDistributedRateLimit(`photo-manual:${user.id}`, 10, 3600))) {
+    return NextResponse.json({ error: 'Muitas requisições. Tente novamente em breve.' }, { status: 429 });
+  }
 
   const consent = await requireCurrentConsent(supabase, user.id);
   if (!consent.ok) {
