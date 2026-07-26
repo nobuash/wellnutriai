@@ -93,6 +93,13 @@ export default function AcceptTermsPage() {
         </p>
       </div>
 
+      <div className="flex flex-wrap gap-x-4 gap-y-1 mt-4 text-sm">
+        <a href="/terms" target="_blank" rel="noopener noreferrer" className="text-brand-600 underline">Termos de Uso</a>
+        <a href="/privacy" target="_blank" rel="noopener noreferrer" className="text-brand-600 underline">Política de Privacidade</a>
+        <a href="/fair-use" target="_blank" rel="noopener noreferrer" className="text-brand-600 underline">Política de Uso Justo</a>
+        <a href="/cancellation" target="_blank" rel="noopener noreferrer" className="text-brand-600 underline">Política de Cancelamento</a>
+      </div>
+
       <label className="flex items-start gap-3 mt-6 cursor-pointer select-none">
         <input
           type="checkbox"
@@ -101,8 +108,8 @@ export default function AcceptTermsPage() {
           className="mt-1 h-5 w-5 rounded border-slate-300 text-brand-600 focus:ring-brand-500"
         />
         <span className="text-sm text-slate-700">
-          Li e aceito os termos acima. Compreendo que o WellNutriAI fornece sugestões geradas por IA
-          e não substitui profissional de saúde.
+          Li e aceito os Termos de Uso e a Política de Privacidade acima. Compreendo que o WellNutriAI
+          fornece sugestões geradas por IA e não substitui profissional de saúde.
         </span>
       </label>
 

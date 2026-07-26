@@ -1,0 +1,99 @@
+import { LegalPageLayout } from '@/components/LegalPageLayout';
+
+export const metadata = { title: 'Política de Privacidade — WellNutriAI' };
+
+// [PLACEHOLDER PARA O MANTENEDOR]: rascunho estrutural com base no que
+// o código efetivamente coleta e processa hoje — não é um documento
+// jurídico pronto. Preencha os campos marcados e peça revisão de um
+// profissional de direito especializado em LGPD antes de publicar.
+export default function PrivacyPage() {
+  return (
+    <LegalPageLayout title="Política de Privacidade" updatedAt="[PLACEHOLDER: data de publicação]">
+      <p>
+        Esta Política descreve como <strong>[PLACEHOLDER: razão social]</strong>{' '}
+        (&quot;WellNutriAI&quot;, &quot;nós&quot;) trata dados pessoais de
+        usuários da Plataforma, em conformidade com a Lei Geral de Proteção
+        de Dados (Lei nº 13.709/2018 — LGPD).
+      </p>
+
+      <h2>1. Controlador de dados</h2>
+      <p>
+        <strong>[PLACEHOLDER: razão social, CNPJ, endereço]</strong>. Encarregado
+        de dados (DPO): <strong>[PLACEHOLDER: nome/e-mail de contato do encarregado]</strong>.
+      </p>
+
+      <h2>2. Dados que coletamos</h2>
+      <ul className="list-disc pl-6 space-y-1">
+        <li>Dados de cadastro: nome, e-mail, senha (armazenada com hash).</li>
+        <li>
+          Dados do questionário nutricional: idade, peso, altura, objetivo,
+          nível de atividade, alergias, preferências alimentares, condições
+          médicas informadas (diabetes, gestação, doenças renal/hepática,
+          entre outras) — usados exclusivamente para gerar sugestões de
+          plano alimentar e aplicar as restrições de segurança
+          correspondentes.
+        </li>
+        <li>Mensagens trocadas com o chat de IA e planos alimentares gerados.</li>
+        <li>Fotos de refeições enviadas para análise por IA, e o resultado dessa análise.</li>
+        <li>
+          Dados de pagamento: processados diretamente pelos provedores
+          Stripe e Mercado Pago — não armazenamos número completo de
+          cartão de crédito.
+        </li>
+        <li>Registros técnicos: endereço IP (com hash, para rate limiting), user agent, logs de uso e erro.</li>
+      </ul>
+
+      <h2>3. Como usamos seus dados</h2>
+      <p>
+        Usamos os dados acima para: operar a Plataforma e suas
+        funcionalidades de IA (geração de plano alimentar, chat, análise de
+        foto), processar pagamentos, cumprir obrigações legais e de
+        prevenção a fraude, e melhorar a segurança do serviço (rate
+        limiting, controle de cota).
+      </p>
+      <p>
+        Dados do questionário e das conversas de chat são enviados a
+        provedores de IA (OpenAI) para gerar as respostas — não enviamos
+        prompts completos, imagens ou questionários para ferramentas de
+        observabilidade/monitoramento de erros.
+      </p>
+
+      <h2>4. Compartilhamento com terceiros</h2>
+      <p>
+        Compartilhamos dados estritamente necessários com: Supabase
+        (hospedagem de banco de dados e armazenamento de arquivos), OpenAI
+        (processamento de IA), Stripe e Mercado Pago (processamento de
+        pagamento), Vercel (hospedagem da aplicação). Não vendemos dados
+        pessoais a terceiros.
+      </p>
+
+      <h2>5. Retenção de dados</h2>
+      <p>
+        Ver a <a href="/data-retention" className="text-brand-600 underline">Política de Retenção de Dados</a>{' '}
+        para prazos específicos por tipo de dado.
+      </p>
+
+      <h2>6. Seus direitos (LGPD)</h2>
+      <p>
+        Você pode solicitar a qualquer momento: confirmação de tratamento,
+        acesso, correção, anonimização, portabilidade ou exclusão dos seus
+        dados. A exclusão de conta está disponível diretamente em{' '}
+        <strong>Configurações da conta</strong> dentro da Plataforma.
+        Para as demais solicitações: <strong>[PLACEHOLDER: e-mail/canal de contato do DPO]</strong>.
+      </p>
+
+      <h2>7. Segurança</h2>
+      <p>
+        Adotamos controles técnicos como controle de acesso por linha
+        (RLS) no banco de dados, criptografia em trânsito, e segregação de
+        credenciais administrativas do restante da aplicação.
+      </p>
+
+      <h2>8. Alterações desta política</h2>
+      <p>
+        Mudanças relevantes exigem novo aceite explícito antes de você
+        continuar usando funcionalidades pagas ou que envolvam IA.
+      </p>
+    </LegalPageLayout>
+  );
+}
