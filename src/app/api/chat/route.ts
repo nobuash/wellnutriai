@@ -3,6 +3,7 @@ import { formatKnowledgeContext, searchKnowledge } from '@/lib/knowledge/search'
 import { buildChatSystemPrompt } from '@/lib/openai/prompts';
 import { canUseFeature } from '@/lib/plans';
 import { getUserEntitlement } from '@/lib/entitlement';
+import { findForbiddenFoods, isHighRiskCondition, mealPlanContentSchema } from '@/lib/mealPlanSafety';
 import { rateLimit } from '@/lib/ratelimit';
 import { createClient } from '@/lib/supabase/server';
 import type { ChatMessage, MealPlan, MealPlanContent, NutritionQuestionnaire } from '@/types/database';
@@ -107,21 +108,41 @@ export async function POST(req: Request) {
     let mealPlanUpdated = false;
 
     try {
-      const parsed2 = JSON.parse(raw) as { reply?: string; meal_plan_update?: MealPlanContent | null };
+      const parsed2 = JSON.parse(raw) as { reply?: string; meal_plan_update?: unknown };
       reply = parsed2.reply ?? reply;
 
       if (parsed2.meal_plan_update && mealPlan?.id) {
-        const updatedContent: MealPlanContent = {
-          ...parsed2.meal_plan_update,
-          disclaimer: parsed2.meal_plan_update.disclaimer || mealPlanContent?.disclaimer || '',
-        };
+        if (questionnaire && isHighRiskCondition(questionnaire)) {
+          // Não deixamos o chat reescrever automaticamente um plano de
+          // usuário com condição de alto risco — mesma regra aplicada na
+          // geração inicial (ver src/app/api/meal-plan/route.ts).
+          reply += '\n\n_Não consigo ajustar automaticamente os números do seu plano por causa da condição de saúde informada — recomendo revisar essa mudança com um(a) nutricionista._';
+        } else {
+          const validated = mealPlanContentSchema.safeParse(parsed2.meal_plan_update);
 
-        await supabase
-          .from('meal_plans')
-          .update({ content: updatedContent, calories_estimate: updatedContent.total_calories ?? null })
-          .eq('id', mealPlan.id);
+          if (validated.success) {
+            const forbidden = findForbiddenFoods(validated.data, questionnaire?.allergies ?? []);
 
-        mealPlanUpdated = true;
+            if (forbidden.length === 0) {
+              const updatedContent: MealPlanContent = {
+                ...validated.data,
+                disclaimer: validated.data.disclaimer || mealPlanContent?.disclaimer || '',
+              };
+
+              await supabase
+                .from('meal_plans')
+                .update({ content: updatedContent, calories_estimate: updatedContent.total_calories ?? null })
+                .eq('id', mealPlan.id);
+
+              mealPlanUpdated = true;
+            } else {
+              console.warn('[chat] meal_plan_update rejeitado por alergia:', forbidden);
+              reply += `\n\n_Não apliquei essa mudança porque o resultado incluiria ${forbidden.join(', ')}, que está na sua lista de alergias/restrições._`;
+            }
+          } else {
+            console.error('[chat] meal_plan_update fora do schema:', validated.error.flatten());
+          }
+        }
       }
     } catch {
       reply = raw;
