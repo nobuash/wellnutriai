@@ -1,13 +1,16 @@
-import { getPayment, PLANS, type PlanInterval } from '@/lib/mercadopago/client';
+import { activateMpPayment } from '@/lib/mercadopago/activatePayment';
 import { checkDistributedRateLimit } from '@/lib/distributedRateLimit';
 import { createClient } from '@/lib/supabase/server';
-import { createServiceClient } from '@/lib/supabase/service';
 import { NextResponse } from 'next/server';
 
 export const runtime = 'nodejs';
 
 // Endpoint para o usuário verificar manualmente se o pagamento foi aprovado
-// e ativar o plano caso o webhook não tenha disparado
+// e ativar o plano caso o webhook não tenha disparado. Chamar isto
+// repetidamente com o mesmo payment_id é seguro por construção —
+// activateMpPayment calcula a expiração a partir de date_approved (data
+// real do provedor), então o resultado é sempre o mesmo, nunca estende
+// a validade a cada nova chamada.
 export async function POST(req: Request) {
   const supabase = createClient();
   const { data: { user } } = await supabase.auth.getUser();
@@ -24,61 +27,21 @@ export async function POST(req: Request) {
   if (!payment_id) return NextResponse.json({ error: 'payment_id obrigatório' }, { status: 400 });
 
   try {
-    const payment = await getPayment().get({ id: Number(payment_id) });
+    const result = await activateMpPayment(Number(payment_id), user.id);
 
-    if (!payment?.id) {
-      return NextResponse.json({ error: 'Pagamento não encontrado' }, { status: 404 });
+    switch (result.outcome) {
+      case 'activated':
+        console.log(`[verify] user=${user.id} plano ativado, expira ${result.expiresAt}`);
+        return NextResponse.json({ status: 'approved', activated: true, expiresAt: result.expiresAt });
+      case 'not_approved':
+        return NextResponse.json({ status: result.status, activated: false, message: 'Pagamento ainda não aprovado' });
+      case 'ownership_mismatch':
+        return NextResponse.json({ error: 'Pagamento não pertence a este usuário' }, { status: 403 });
+      case 'amount_mismatch':
+        return NextResponse.json({ error: 'Valor do pagamento não confere com o plano' }, { status: 400 });
+      case 'revoked':
+        return NextResponse.json({ status: 'revoked', activated: false, message: 'Pagamento não está mais aprovado' });
     }
-
-    // Garante que o pagamento pertence a este usuário
-    const externalRef = payment.external_reference as string ?? '';
-    const [userId] = externalRef.split(':');
-
-    if (userId !== user.id) {
-      return NextResponse.json({ error: 'Pagamento não pertence a este usuário' }, { status: 403 });
-    }
-
-    if (payment.status !== 'approved') {
-      return NextResponse.json({ status: payment.status, message: 'Pagamento ainda não aprovado' });
-    }
-
-    const rawInterval = externalRef.split(':')[1] ?? 'monthly';
-    const planInterval: PlanInterval =
-      rawInterval === 'quarterly' || rawInterval === 'annual' ? rawInterval : 'monthly';
-
-    const durationDays = PLANS[planInterval].durationDays;
-    const expiresAt = new Date();
-    expiresAt.setDate(expiresAt.getDate() + durationDays);
-
-    // subscriptions e profiles.plan só aceitam escrita via service_role
-    // (RLS + trigger protect_plan_column).
-    const service = createServiceClient();
-
-    await service.from('subscriptions').upsert(
-      {
-        user_id: user.id,
-        plan: 'pro',
-        mp_subscription_id: String(payment.id),
-        mp_status: 'authorized',
-        payment_type: payment.payment_method_id === 'pix' ? 'pix' : 'card',
-        expires_at: expiresAt.toISOString(),
-        provider: 'mercadopago',
-        provider_subscription_id: String(payment.id),
-        provider_payment_id: String(payment.id),
-        status: 'active',
-        billing_interval: planInterval,
-        current_period_end: expiresAt.toISOString(),
-        cancel_at_period_end: false,
-        canceled_at: null,
-      },
-      { onConflict: 'mp_subscription_id' }
-    );
-
-    await service.from('profiles').update({ plan: 'pro' }).eq('id', user.id);
-
-    console.log(`[verify] user=${user.id} plano ativado via verificação manual, expira ${expiresAt.toISOString()}`);
-
-    return NextResponse.json({ status: 'approved', activated: true });
   } catch (err) {
     console.error('[verify] error:', err);
     return NextResponse.json({ error: 'Erro ao verificar pagamento' }, { status: 500 });

@@ -16,6 +16,7 @@ interface Props {
 export function StripeCardModal({ planInterval, onClose }: Props) {
   const plan = PLANS[planInterval];
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [hasActiveSubscription, setHasActiveSubscription] = useState(false);
 
   const fetchClientSecret = useCallback(async () => {
     const res = await fetch('/api/payment/stripe/intent', {
@@ -26,6 +27,7 @@ export function StripeCardModal({ planInterval, onClose }: Props) {
     const data = await res.json();
     if (!res.ok || !data.clientSecret) {
       setLoadError(data.error ?? 'Erro ao iniciar pagamento');
+      if (data.code === 'ACTIVE_SUBSCRIPTION_EXISTS') setHasActiveSubscription(true);
       return '';
     }
     return data.clientSecret as string;
@@ -48,7 +50,17 @@ export function StripeCardModal({ planInterval, onClose }: Props) {
         </div>
 
         {loadError && (
-          <p className="text-sm text-red-600 text-center py-6">{loadError}</p>
+          <div className="text-center py-6 space-y-3">
+            <p className="text-sm text-red-600">{loadError}</p>
+            {hasActiveSubscription && (
+              <button
+                onClick={onClose}
+                className="text-sm font-medium text-brand-600 hover:underline"
+              >
+                Ver minha assinatura
+              </button>
+            )}
+          </div>
         )}
 
         {!loadError && (

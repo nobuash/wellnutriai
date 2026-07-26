@@ -1,16 +1,12 @@
-import { getPayment, getPreApproval, PLANS, type PlanInterval } from '@/lib/mercadopago/client';
+import { activateMpPayment } from '@/lib/mercadopago/activatePayment';
+import { getPayment, getPreApproval } from '@/lib/mercadopago/client';
 import { verifyMPSignature } from '@/lib/mercadopago/webhook';
-import { createClient as createServerClient } from '@supabase/supabase-js';
+import { createServiceClient } from '@/lib/supabase/service';
+import { recalculateVisualPlanCache } from '@/lib/subscriptionCache';
+import { withWebhookIdempotency } from '@/lib/webhookIdempotency';
 import { NextRequest, NextResponse } from 'next/server';
 
 export const runtime = 'nodejs';
-
-function getServiceClient() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY!;
-  if (!url || !key) throw new Error('Supabase service role não configurado');
-  return createServerClient(url, key);
-}
 
 export async function POST(req: NextRequest) {
   const xSignature = req.headers.get('x-signature') ?? '';
@@ -32,7 +28,16 @@ export async function POST(req: NextRequest) {
     req.nextUrl.searchParams.get('topic') ??
     '';
 
-  console.log(`[webhook] type=${type} dataId=${dataId} sig=${xSignature ? 'present' : 'absent'} body=${rawBody.slice(0, 300)}`);
+  // Id da notificação em si (distinto do id do recurso/dataId) — o MP
+  // envia isso na maioria das notificações modernas. Usamos como chave
+  // de dedup preferencial porque é único POR NOTIFICAÇÃO: uma transição
+  // real de status (pending -> approved) do MESMO recurso gera uma
+  // notificação NOVA com um notificationId diferente, então não colide
+  // com a anterior — ao contrário de usar só `type+dataId`, que é fixo
+  // para um recurso e bloqueava transições de status reais.
+  const notificationId = (body?.id as string | number | undefined)?.toString();
+
+  console.log(`[webhook] type=${type} dataId=${dataId} notificationId=${notificationId ?? 'n/a'} sig=${xSignature ? 'present' : 'absent'}`);
 
   // Rejeita se assinatura ausente ou inválida — nunca processar sem verificação
   if (!xSignature || !verifyMPSignature(xSignature, xRequestId, dataId)) {
@@ -45,103 +50,87 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: true });
   }
 
-  const supabase = getServiceClient();
+  // Fallback quando não há notificationId: chave por recurso+status
+  // atual. Ainda assim permite reprocessar uma transição real de
+  // status, porque o status muda entre uma chamada e outra.
+  let eventKey = notificationId ? `mp:evt:${notificationId}` : null;
+  let resourceStatus: string | null = null;
 
-  try {
-    // Idempotência: ignora eventos já processados
-    const eventKey = `mp_${type}_${dataId}`;
-    const { error: dupErr } = await supabase
-      .from('processed_webhooks')
-      .insert({ id: eventKey });
-    if (dupErr) {
-      // Conflito de chave primária = já processado
-      return NextResponse.json({ ok: true });
+  if (!eventKey) {
+    try {
+      if (type === 'payment') {
+        const payment = await getPayment().get({ id: Number(dataId) });
+        resourceStatus = (payment?.status as string) ?? null;
+      }
+    } catch {
+      // segue sem resourceStatus — cai no fallback abaixo
     }
+    eventKey = `mp:res:${type}:${dataId}:${resourceStatus ?? 'unknown'}`;
+  }
 
-    // PIX — pagamento único
-    if (type === 'payment') {
-      const payment = await getPayment().get({ id: Number(dataId) });
-      if (!payment?.id || !payment.external_reference) return NextResponse.json({ ok: true });
-
-      const externalRef = payment.external_reference as string;
-      const [userId, rawInterval = 'monthly'] = externalRef.split(':');
-      const planInterval: PlanInterval =
-        rawInterval === 'quarterly' || rawInterval === 'annual' ? rawInterval : 'monthly';
-      const status = payment.status as string; // approved | pending | rejected
-
-      console.log(`[webhook/payment] id=${payment.id} status=${status} method=${payment.payment_method_id} user=${userId} interval=${planInterval}`);
-
-      if (status === 'approved') {
-        const durationDays = PLANS[planInterval].durationDays;
-        const expiresAt = new Date();
-        expiresAt.setDate(expiresAt.getDate() + durationDays);
-        const paymentType = payment.payment_method_id === 'pix' ? 'pix' : 'card';
-
-        await supabase.from('subscriptions').upsert(
-          {
-            user_id: userId,
-            plan: 'pro',
-            mp_subscription_id: String(payment.id),
-            mp_status: 'authorized',
-            payment_type: paymentType,
-            expires_at: expiresAt.toISOString(),
-            provider: 'mercadopago',
-            provider_subscription_id: String(payment.id),
-            provider_payment_id: String(payment.id),
-            status: 'active',
-            billing_interval: planInterval,
-            current_period_end: expiresAt.toISOString(),
-            cancel_at_period_end: false,
-            canceled_at: null,
-          },
-          { onConflict: 'mp_subscription_id' }
-        );
-
-        await supabase.from('profiles').update({ plan: 'pro' }).eq('id', userId);
-        console.log(`[webhook/payment] user=${userId} ativado como PRO, expira ${expiresAt.toISOString()}`);
+  const outcome = await withWebhookIdempotency(
+    {
+      provider: 'mercadopago',
+      eventKey,
+      eventType: type,
+      resourceId: dataId,
+      resourceStatus,
+    },
+    async () => {
+      if (type === 'payment') {
+        const result = await activateMpPayment(Number(dataId));
+        console.log(`[webhook/payment] dataId=${dataId} outcome=${result.outcome}`);
+        if (result.outcome === 'amount_mismatch' || result.outcome === 'ownership_mismatch') {
+          // Não trata como falha de infraestrutura (não deve gerar
+          // retry do provedor) — é uma rejeição de negócio válida.
+          console.error(`[webhook/payment] rejeitado: ${result.outcome} dataId=${dataId}`);
+        }
+        return;
       }
 
-      return NextResponse.json({ ok: true });
-    }
+      // Assinatura recorrente do MP (preapproval) — nenhum fluxo atual
+      // do produto cria uma de verdade (ver docs/payment-flows.md), mas
+      // o handler fica correto para quando isso existir.
+      if (type === 'preapproval') {
+        const sub = await getPreApproval().get({ id: String(dataId) });
+        if (!sub?.id || !sub.external_reference) return;
 
-    // Assinatura recorrente (cartão)
-    if (type === 'preapproval') {
-      const sub = await getPreApproval().get({ id: String(dataId) });
-      if (!sub?.id || !sub.external_reference) return NextResponse.json({ ok: true });
+        const userId = sub.external_reference as string;
+        const mpStatus = sub.status as string;
+        const nextPaymentDate = (sub.auto_recurring as Record<string, string> | undefined)?.end_date ?? null;
+        const normalizedStatus =
+          mpStatus === 'authorized' ? 'active' :
+          mpStatus === 'cancelled' ? 'canceled' :
+          mpStatus === 'paused' ? 'past_due' : 'pending';
 
-      const userId = sub.external_reference as string;
-      const mpStatus = sub.status as string;
-      const newPlan = mpStatus === 'authorized' ? 'pro' : 'free';
-      const nextPaymentDate = (sub.auto_recurring as Record<string, string> | undefined)?.end_date ?? null;
-      const normalizedStatus =
-        mpStatus === 'authorized' ? 'active' :
-        mpStatus === 'cancelled' ? 'canceled' :
-        mpStatus === 'paused' ? 'past_due' : 'pending';
+        const service = createServiceClient();
+        await service.from('subscriptions').upsert(
+          {
+            user_id: userId,
+            plan: normalizedStatus === 'active' ? 'pro' : 'free',
+            mp_subscription_id: sub.id,
+            mp_status: mpStatus,
+            next_payment_date: nextPaymentDate,
+            payment_type: 'subscription',
+            provider: 'mercadopago',
+            provider_subscription_id: sub.id,
+            status: normalizedStatus,
+            current_period_end: nextPaymentDate,
+            canceled_at: mpStatus === 'cancelled' ? new Date().toISOString() : null,
+          },
+          { onConflict: 'mp_subscription_id' },
+        );
 
-      await supabase.from('subscriptions').upsert(
-        {
-          user_id: userId,
-          plan: newPlan,
-          mp_subscription_id: sub.id,
-          mp_status: mpStatus,
-          next_payment_date: nextPaymentDate,
-          payment_type: 'subscription',
-          provider: 'mercadopago',
-          provider_subscription_id: sub.id,
-          status: normalizedStatus,
-          current_period_end: nextPaymentDate,
-          canceled_at: mpStatus === 'cancelled' ? new Date().toISOString() : null,
-        },
-        { onConflict: 'mp_subscription_id' }
-      );
+        await recalculateVisualPlanCache(service, userId);
+        console.log(`[webhook/subscription] user=${userId} status=${mpStatus}`);
+      }
+    },
+  );
 
-      await supabase.from('profiles').update({ plan: newPlan }).eq('id', userId);
-      console.log(`[webhook/subscription] user=${userId} status=${mpStatus} plan=${newPlan}`);
-    }
-
-    return NextResponse.json({ ok: true });
-  } catch (err) {
-    console.error('[webhook] error:', err);
-    return NextResponse.json({ error: 'Erro interno' }, { status: 500 });
+  if (outcome === 'failed') {
+    // Sinaliza erro pro MP tentar reentregar depois.
+    return NextResponse.json({ error: 'Falha ao processar' }, { status: 500 });
   }
+
+  return NextResponse.json({ ok: true });
 }

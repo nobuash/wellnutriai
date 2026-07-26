@@ -1,23 +1,12 @@
 import { getStripe } from '@/lib/stripe/client';
-import { type PlanInterval } from '@/lib/mercadopago/client';
-import { createClient as createServiceClient } from '@supabase/supabase-js';
+import { activateStripeSubscription } from '@/lib/stripe/activateSubscription';
+import { createServiceClient } from '@/lib/supabase/service';
+import { recalculateVisualPlanCache } from '@/lib/subscriptionCache';
+import { withWebhookIdempotency } from '@/lib/webhookIdempotency';
 import { NextRequest, NextResponse } from 'next/server';
 import type Stripe from 'stripe';
 
 export const runtime = 'nodejs';
-
-const PLAN_DAYS: Record<PlanInterval, number> = {
-  monthly: 30,
-  quarterly: 90,
-  annual: 365,
-};
-
-function getServiceSupabase() {
-  return createServiceClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
-  );
-}
 
 export async function POST(req: NextRequest) {
   const rawBody = await req.text();
@@ -38,98 +27,117 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Assinatura inválida' }, { status: 400 });
   }
 
-  const db = getServiceSupabase();
+  // event.id é estável entre reentregas do MESMO evento pela Stripe —
+  // dedup key perfeita, sem os problemas de keying do lado do MP.
+  const outcome = await withWebhookIdempotency(
+    { provider: 'stripe', eventKey: event.id, eventType: event.type },
+    () => processStripeEvent(event),
+  );
 
-  try {
-    // Idempotência: ignora eventos Stripe já processados
-    const { error: dupErr } = await db
-      .from('processed_webhooks')
-      .insert({ id: `stripe_${event.id}` });
-    if (dupErr) {
-      return NextResponse.json({ ok: true });
-    }
+  if (outcome === 'failed') {
+    return NextResponse.json({ error: 'Falha ao processar' }, { status: 500 });
+  }
 
-    // Renovação paga com sucesso
-    if (event.type === 'invoice.payment_succeeded') {
-      const invoice = event.data.object as Stripe.Invoice;
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const subscriptionId = (invoice as any).subscription as string;
-      if (!subscriptionId) return NextResponse.json({ ok: true });
+  return NextResponse.json({ ok: true });
+}
 
-      const stripe = getStripe();
-      const sub = await stripe.subscriptions.retrieve(subscriptionId);
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const meta = sub.metadata as any;
-      const userId = meta?.userId as string;
-      if (!userId) return NextResponse.json({ ok: true });
+async function processStripeEvent(event: Stripe.Event): Promise<void> {
+  const db = createServiceClient();
 
-      const planInterval = (meta?.planInterval ?? 'monthly') as PlanInterval;
-      const days = PLAN_DAYS[planInterval];
-      const expiresAt = new Date();
-      expiresAt.setDate(expiresAt.getDate() + days);
+  // Renovação paga com sucesso — sincroniza com o estado real da
+  // assinatura na Stripe (datas de período vêm de lá, nunca de now()).
+  if (event.type === 'invoice.payment_succeeded') {
+    const invoice = event.data.object as Stripe.Invoice;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const subscriptionId = (invoice as any).subscription as string | undefined;
+    if (!subscriptionId) return;
 
-      await db.from('subscriptions').upsert(
-        {
-          user_id: userId,
-          plan: 'pro',
-          mp_subscription_id: subscriptionId,
-          mp_status: 'authorized',
-          payment_type: 'card',
-          expires_at: expiresAt.toISOString(),
-          provider: 'stripe',
-          provider_subscription_id: subscriptionId,
-          provider_customer_id: typeof sub.customer === 'string' ? sub.customer : sub.customer?.id ?? null,
-          status: 'active',
-          billing_interval: planInterval,
-          current_period_end: expiresAt.toISOString(),
-          cancel_at_period_end: sub.cancel_at_period_end ?? false,
-          canceled_at: null,
-        },
-        { onConflict: 'mp_subscription_id' }
-      );
-      await db.from('profiles').update({ plan: 'pro' }).eq('id', userId);
-      console.log(`[stripe/webhook] renovação user=${userId} sub=${subscriptionId} expira=${expiresAt.toISOString()}`);
-    }
+    const result = await activateStripeSubscription(subscriptionId);
+    console.log(`[stripe/webhook] invoice.payment_succeeded sub=${subscriptionId} outcome=${result.outcome}`);
+    return;
+  }
 
-    // Falha de cobrança (cartão recusado na renovação)
-    if (event.type === 'invoice.payment_failed') {
-      const invoice = event.data.object as Stripe.Invoice;
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const subscriptionId = (invoice as any).subscription as string;
-      if (!subscriptionId) return NextResponse.json({ ok: true });
+  // Falha de cobrança (cartão recusado na renovação)
+  if (event.type === 'invoice.payment_failed') {
+    const invoice = event.data.object as Stripe.Invoice;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const subscriptionId = (invoice as any).subscription as string | undefined;
+    if (!subscriptionId) return;
 
-      await db.from('subscriptions')
-        .update({ status: 'payment_failed', mp_status: 'cancelled' })
-        .eq('mp_subscription_id', subscriptionId);
-      console.log(`[stripe/webhook] falha de pagamento sub=${subscriptionId}`);
-    }
+    await db.from('subscriptions')
+      .update({ status: 'payment_failed', mp_status: 'cancelled' })
+      .eq('provider_subscription_id', subscriptionId);
+    console.log(`[stripe/webhook] falha de pagamento sub=${subscriptionId}`);
+    return;
+  }
 
-    // Assinatura cancelada ou expirada
-    if (event.type === 'customer.subscription.deleted') {
-      const sub = event.data.object as Stripe.Subscription;
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const userId = (sub.metadata as any)?.userId as string;
-      if (!userId) return NextResponse.json({ ok: true });
+  // Assinatura cancelada ou expirada
+  if (event.type === 'customer.subscription.deleted') {
+    const sub = event.data.object as Stripe.Subscription;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const userId = (sub.metadata as any)?.userId as string | undefined;
 
-      await db.from('subscriptions')
-        .update({ mp_status: 'cancelled', status: 'canceled', canceled_at: new Date().toISOString() })
-        .eq('mp_subscription_id', sub.id);
-      await db.from('profiles').update({ plan: 'free' }).eq('id', userId);
-      console.log(`[stripe/webhook] cancelamento user=${userId} sub=${sub.id}`);
-    }
+    await db.from('subscriptions')
+      .update({ mp_status: 'cancelled', status: 'canceled', canceled_at: new Date().toISOString() })
+      .eq('provider_subscription_id', sub.id);
 
-    // Assinatura marcada para cancelar ao fim do período (usuário clicou cancelar)
-    // ou teve o cancel_at_period_end revertido — mantém o banco em sincronia com a Stripe.
-    if (event.type === 'customer.subscription.updated') {
-      const sub = event.data.object as Stripe.Subscription;
-      await db.from('subscriptions')
-        .update({ cancel_at_period_end: sub.cancel_at_period_end ?? false })
-        .eq('mp_subscription_id', sub.id);
-    }
+    if (userId) await recalculateVisualPlanCache(db, userId);
+    console.log(`[stripe/webhook] cancelamento user=${userId ?? '?'} sub=${sub.id}`);
+    return;
+  }
 
-    return NextResponse.json({ ok: true });
-  } catch (err) {
-    console.error('[stripe/webhook] error:', err);
-    return NextResponse.json({ error: 'Erro interno' }, { status: 500 });
+  // customer.subscription.created/updated: sincroniza o estado completo
+  // (inclui cancel_at_period_end e mudanças de status como past_due).
+  if (event.type === 'customer.subscription.created' || event.type === 'customer.subscription.updated') {
+    const sub = event.data.object as Stripe.Subscription;
+    const result = await activateStripeSubscription(sub.id);
+    console.log(`[stripe/webhook] ${event.type} sub=${sub.id} outcome=${result.outcome}`);
+    return;
+  }
+
+  // Estorno — remove o acesso correspondente. charge.refunded não traz
+  // o id da assinatura diretamente; buscamos via payment_intent ->
+  // invoice quando disponível. Se não for uma cobrança de assinatura
+  // (ex: não deveria acontecer no fluxo atual, só cartão/PIX MP tem
+  // pagamento avulso), não há o que fazer aqui.
+  if (event.type === 'charge.refunded') {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const charge = event.data.object as any as Stripe.Charge & { invoice: string | { id: string } | null };
+    const invoiceId = typeof charge.invoice === 'string' ? charge.invoice : charge.invoice?.id;
+    if (!invoiceId) return;
+
+    const stripe = getStripe();
+    const invoice = await stripe.invoices.retrieve(invoiceId);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const subscriptionId = (invoice as any).subscription as string | undefined;
+    if (!subscriptionId) return;
+
+    const { data: row } = await db
+      .from('subscriptions')
+      .select('user_id')
+      .eq('provider_subscription_id', subscriptionId)
+      .maybeSingle();
+
+    await db.from('subscriptions')
+      .update({ status: 'canceled', mp_status: 'cancelled', canceled_at: new Date().toISOString() })
+      .eq('provider_subscription_id', subscriptionId);
+
+    if (row?.user_id) await recalculateVisualPlanCache(db, row.user_id);
+    console.log(`[stripe/webhook] estorno sub=${subscriptionId}`);
+    return;
+  }
+
+  // Contestação de cobrança (chargeback) — registra para revisão manual.
+  // Não revoga automaticamente: a disputa pode ser vencida pelo
+  // lojista; revogar de imediato é uma decisão comercial, não técnica.
+  if (event.type === 'charge.dispute.created') {
+    const dispute = event.data.object as Stripe.Dispute;
+    console.warn(`[stripe/webhook] disputa aberta charge=${dispute.charge} motivo=${dispute.reason} — revisar manualmente`);
+    await db.from('audit_log').insert({
+      user_id: null,
+      action: 'stripe_dispute_created',
+      metadata: { charge: String(dispute.charge), reason: dispute.reason },
+    });
+    return;
   }
 }

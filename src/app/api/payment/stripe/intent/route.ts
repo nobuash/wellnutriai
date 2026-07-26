@@ -1,6 +1,7 @@
 import { getStripe, STRIPE_INTERVALS } from '@/lib/stripe/client';
 import { type PlanInterval } from '@/lib/mercadopago/client';
 import { checkDistributedRateLimit } from '@/lib/distributedRateLimit';
+import { findActiveStripeSubscription } from '@/lib/stripe/activateSubscription';
 import { createClient } from '@/lib/supabase/server';
 import { NextResponse } from 'next/server';
 
@@ -47,6 +48,20 @@ export async function POST(req: Request) {
 
   const { planInterval = 'monthly' } = await req.json().catch(() => ({})) as { planInterval?: PlanInterval };
   if (!STRIPE_INTERVALS[planInterval]) return NextResponse.json({ error: 'Plano inválido' }, { status: 400 });
+
+  // Impede duas assinaturas recorrentes simultâneas — antes, nada
+  // aqui checava se o usuário já tinha uma ativa antes de criar outra.
+  const existingSub = await findActiveStripeSubscription(user.id);
+  if (existingSub) {
+    return NextResponse.json(
+      {
+        error: 'Você já possui uma assinatura recorrente ativa.',
+        code: 'ACTIVE_SUBSCRIPTION_EXISTS',
+        manageSubscription: true,
+      },
+      { status: 409 },
+    );
+  }
 
   const email = user.email ?? `${user.id}@wellnutriai.app`;
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://wellnutriai.com';
