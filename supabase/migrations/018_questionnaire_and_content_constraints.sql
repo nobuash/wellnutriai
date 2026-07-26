@@ -92,19 +92,63 @@ begin
 exception when duplicate_object then null;
 end $$;
 
--- Tenta validar todas de uma vez contra os dados existentes; se algo
--- violar, cai no NOTICE e segue sem travar a migration.
-do $$
-begin
+-- Valida cada constraint contra os dados existentes em blocos
+-- SEPARADOS: um BEGIN...EXCEPTION é uma subtransação, então se todas
+-- estivessem no mesmo bloco, uma falha de validação numa (dado antigo
+-- fora do limite) faria rollback do bloco inteiro e desfaria a
+-- validação das outras que estavam limpas. Cada uma aqui é
+-- independente — as demais continuam sendo validadas mesmo se uma
+-- falhar.
+do $$ begin
   alter table public.nutrition_questionnaires validate constraint nutrition_questionnaires_routine_length;
+exception when check_violation then
+  raise notice 'nutrition_questionnaires_routine_length não pôde ser validada contra dados existentes — ficou NOT VALID (protege writes novos).';
+end $$;
+
+do $$ begin
   alter table public.nutrition_questionnaires validate constraint nutrition_questionnaires_weight_range;
+exception when check_violation then
+  raise notice 'nutrition_questionnaires_weight_range não pôde ser validada contra dados existentes — ficou NOT VALID (protege writes novos).';
+end $$;
+
+do $$ begin
   alter table public.nutrition_questionnaires validate constraint nutrition_questionnaires_height_range;
+exception when check_violation then
+  raise notice 'nutrition_questionnaires_height_range não pôde ser validada contra dados existentes — ficou NOT VALID (protege writes novos).';
+end $$;
+
+do $$ begin
   alter table public.nutrition_questionnaires validate constraint nutrition_questionnaires_body_fat_range;
+exception when check_violation then
+  raise notice 'nutrition_questionnaires_body_fat_range não pôde ser validada contra dados existentes — ficou NOT VALID (protege writes novos).';
+end $$;
+
+do $$ begin
   alter table public.nutrition_questionnaires validate constraint nutrition_questionnaires_allergies_limit;
+exception when check_violation then
+  raise notice 'nutrition_questionnaires_allergies_limit não pôde ser validada contra dados existentes — ficou NOT VALID (protege writes novos).';
+end $$;
+
+do $$ begin
   alter table public.nutrition_questionnaires validate constraint nutrition_questionnaires_preferences_limit;
+exception when check_violation then
+  raise notice 'nutrition_questionnaires_preferences_limit não pôde ser validada contra dados existentes — ficou NOT VALID (protege writes novos).';
+end $$;
+
+do $$ begin
   alter table public.nutrition_questionnaires validate constraint nutrition_questionnaires_disliked_limit;
+exception when check_violation then
+  raise notice 'nutrition_questionnaires_disliked_limit não pôde ser validada contra dados existentes — ficou NOT VALID (protege writes novos).';
+end $$;
+
+do $$ begin
   alter table public.chat_messages validate constraint chat_messages_length;
+exception when check_violation then
+  raise notice 'chat_messages_length não pôde ser validada contra dados existentes — ficou NOT VALID (protege writes novos).';
+end $$;
+
+do $$ begin
   alter table public.meal_plans validate constraint meal_plans_content_size;
 exception when check_violation then
-  raise notice 'Alguma constraint nova não pôde ser validada contra dados existentes — ficou NOT VALID (protege writes novos). Revise manualmente.';
+  raise notice 'meal_plans_content_size não pôde ser validada contra dados existentes — ficou NOT VALID (protege writes novos).';
 end $$;
