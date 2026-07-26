@@ -1,13 +1,15 @@
 import { getPayment, PLANS, type PlanInterval } from '@/lib/mercadopago/client';
 import { createServiceClient } from '@/lib/supabase/service';
 import { recalculateVisualPlanCache } from '@/lib/subscriptionCache';
+import { requireSupabaseSuccess } from '@/lib/supabaseErrors';
 
 export type MpActivationResult =
   | { outcome: 'activated'; expiresAt: string }
   | { outcome: 'revoked' } // reembolsado/estornado/rejeitado/cancelado — acesso removido
   | { outcome: 'not_approved'; status: string } // ainda pending/in_process/etc.
   | { outcome: 'ownership_mismatch' }
-  | { outcome: 'amount_mismatch' };
+  | { outcome: 'amount_mismatch' }
+  | { outcome: 'missing_approval_date' }; // approved mas sem timestamp confiável — não ativa às cegas
 
 const REVOKING_STATUSES = new Set(['refunded', 'cancelled', 'charged_back', 'rejected']);
 
@@ -25,12 +27,13 @@ export type MpEvaluation =
   | { kind: 'ownership_mismatch' }
   | { kind: 'not_approved'; status: string }
   | { kind: 'amount_mismatch' }
+  | { kind: 'missing_approval_date' }
   | { kind: 'revoke'; userId: string; newStatus: 'canceled' | 'expired' }
   | {
       kind: 'activate';
       userId: string;
       planInterval: PlanInterval;
-      paymentType: 'pix' | 'card';
+      paymentType: 'pix' | 'one_time_card';
       approvedAt: string;
       expiresAt: string;
     };
@@ -82,8 +85,18 @@ export function evaluateMpPayment(payment: MpPaymentLike, expectedUserId?: strin
     return { kind: 'amount_mismatch' };
   }
 
-  // Data real de aprovação do provedor — nunca Date.now().
-  const approvedAt = payment.date_approved ? new Date(payment.date_approved) : new Date();
+  // Data real de aprovação do provedor — NUNCA Date.now(). Um pagamento
+  // approved sem date_approved é raro mas acontece (inconsistência
+  // momentânea da API do MP); usar a hora atual como fallback reabria o
+  // replay que este código inteiro existe para fechar — reprocessar o
+  // mesmo payment_id em momentos diferentes dava expiresAt diferentes.
+  // Sem timestamp confiável, não ativa: fica para revisão manual em vez
+  // de arriscar conceder acesso com validade não-determinística.
+  if (!payment.date_approved) {
+    return { kind: 'missing_approval_date' };
+  }
+
+  const approvedAt = new Date(payment.date_approved);
   const expiresAt = new Date(approvedAt);
   expiresAt.setDate(expiresAt.getDate() + plan.durationDays);
 
@@ -91,7 +104,10 @@ export function evaluateMpPayment(payment: MpPaymentLike, expectedUserId?: strin
     kind: 'activate',
     userId,
     planInterval,
-    paymentType: payment.payment_method_id === 'pix' ? 'pix' : 'card',
+    // 'one_time_card': cartão avulso do MP, nunca confundir com
+    // payment_type='subscription' (assinatura recorrente real, seja
+    // Stripe ou preapproval do MP) — ver src/lib/subscriptionTypes.ts.
+    paymentType: payment.payment_method_id === 'pix' ? 'pix' : 'one_time_card',
     approvedAt: approvedAt.toISOString(),
     expiresAt: expiresAt.toISOString(),
   };
@@ -142,15 +158,29 @@ export async function activateMpPayment(
       );
       return { outcome: 'amount_mismatch' };
 
+    case 'missing_approval_date':
+      // approved sem date_approved: não é um erro de infraestrutura (não
+      // deve gerar retry do provedor), é um caso que precisa de revisão
+      // manual — registra em audit_log para investigação.
+      console.error(`[mp] pagamento approved sem date_approved — não ativado automaticamente: payment=${payment.id}`);
+      await service.from('audit_log').insert({
+        user_id: null,
+        action: 'mp_payment_missing_approval_date',
+        metadata: { payment_id: String(payment.id), status: payment.status },
+      }).then(({ error }) => {
+        if (error) console.error('[mp] falha ao registrar audit log de missing_approval_date:', error);
+      });
+      return { outcome: 'missing_approval_date' };
+
     case 'revoke': {
-      await service
+      await requireSupabaseSuccess(service
         .from('subscriptions')
         .update({
           status: evaluation.newStatus,
           mp_status: 'cancelled',
           canceled_at: new Date().toISOString(),
         })
-        .eq('provider_subscription_id', String(payment.id));
+        .eq('provider_subscription_id', String(payment.id)));
 
       // Só rebaixa o cache visual se não houver OUTRA assinatura ativa —
       // ver getUserEntitlement, que é quem decide de verdade.
@@ -159,7 +189,7 @@ export async function activateMpPayment(
     }
 
     case 'activate': {
-      await service.from('subscriptions').upsert(
+      await requireSupabaseSuccess(service.from('subscriptions').upsert(
         {
           user_id: evaluation.userId,
           plan: 'pro',
@@ -178,7 +208,7 @@ export async function activateMpPayment(
           canceled_at: null,
         },
         { onConflict: 'mp_subscription_id' },
-      );
+      ));
 
       await recalculateVisualPlanCache(service, evaluation.userId);
       return { outcome: 'activated', expiresAt: evaluation.expiresAt };

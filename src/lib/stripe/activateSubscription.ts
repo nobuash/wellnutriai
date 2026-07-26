@@ -2,6 +2,8 @@ import { getStripe } from '@/lib/stripe/client';
 import type { PlanInterval } from '@/lib/mercadopago/client';
 import { createServiceClient } from '@/lib/supabase/service';
 import { recalculateVisualPlanCache } from '@/lib/subscriptionCache';
+import { requireSupabaseSuccess } from '@/lib/supabaseErrors';
+import type { PaymentType } from '@/lib/subscriptionTypes';
 import type Stripe from 'stripe';
 
 export type StripeActivationResult =
@@ -57,13 +59,19 @@ export async function activateStripeSubscription(
   const service = createServiceClient();
   const customerId = typeof sub.customer === 'string' ? sub.customer : (sub.customer as Stripe.Customer | null)?.id ?? null;
 
-  await service.from('subscriptions').upsert(
+  // payment_type='subscription': toda assinatura Stripe criada por
+  // activateStripeSubscription vem de um Checkout com mode='subscription'
+  // (ver src/app/api/payment/stripe/intent/route.ts) — é sempre
+  // recorrente. Gravar 'card' aqui (bug confirmado no round 3) fazia
+  // cancelamento e exclusão de conta nunca encontrarem a assinatura,
+  // porque as duas rotas buscam especificamente payment_type='subscription'.
+  await requireSupabaseSuccess(service.from('subscriptions').upsert(
     {
       user_id: userId,
       plan: isActive ? 'pro' : 'free',
       mp_subscription_id: subscriptionId,
       mp_status: isActive ? 'authorized' : 'cancelled',
-      payment_type: 'card',
+      payment_type: 'subscription' satisfies PaymentType,
       expires_at: periodEnd?.toISOString() ?? null,
       provider: 'stripe',
       provider_subscription_id: subscriptionId,
@@ -76,7 +84,7 @@ export async function activateStripeSubscription(
       canceled_at: sub.canceled_at ? new Date(sub.canceled_at * 1000).toISOString() : null,
     },
     { onConflict: 'mp_subscription_id' },
-  );
+  ));
 
   await recalculateVisualPlanCache(service, userId);
 

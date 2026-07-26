@@ -3,6 +3,7 @@ import { getPayment, getPreApproval } from '@/lib/mercadopago/client';
 import { verifyMPSignature } from '@/lib/mercadopago/webhook';
 import { createServiceClient } from '@/lib/supabase/service';
 import { recalculateVisualPlanCache } from '@/lib/subscriptionCache';
+import { requireSupabaseSuccess } from '@/lib/supabaseErrors';
 import { withWebhookIdempotency } from '@/lib/webhookIdempotency';
 import { NextRequest, NextResponse } from 'next/server';
 
@@ -80,9 +81,14 @@ export async function POST(req: NextRequest) {
       if (type === 'payment') {
         const result = await activateMpPayment(Number(dataId));
         console.log(`[webhook/payment] dataId=${dataId} outcome=${result.outcome}`);
-        if (result.outcome === 'amount_mismatch' || result.outcome === 'ownership_mismatch') {
+        if (
+          result.outcome === 'amount_mismatch' ||
+          result.outcome === 'ownership_mismatch' ||
+          result.outcome === 'missing_approval_date'
+        ) {
           // Não trata como falha de infraestrutura (não deve gerar
-          // retry do provedor) — é uma rejeição de negócio válida.
+          // retry do provedor) — é uma rejeição de negócio válida ou um
+          // caso que precisa de revisão manual, não um erro transitório.
           console.error(`[webhook/payment] rejeitado: ${result.outcome} dataId=${dataId}`);
         }
         return;
@@ -104,7 +110,7 @@ export async function POST(req: NextRequest) {
           mpStatus === 'paused' ? 'past_due' : 'pending';
 
         const service = createServiceClient();
-        await service.from('subscriptions').upsert(
+        await requireSupabaseSuccess(service.from('subscriptions').upsert(
           {
             user_id: userId,
             plan: normalizedStatus === 'active' ? 'pro' : 'free',
@@ -119,7 +125,7 @@ export async function POST(req: NextRequest) {
             canceled_at: mpStatus === 'cancelled' ? new Date().toISOString() : null,
           },
           { onConflict: 'mp_subscription_id' },
-        );
+        ));
 
         await recalculateVisualPlanCache(service, userId);
         console.log(`[webhook/subscription] user=${userId} status=${mpStatus}`);
