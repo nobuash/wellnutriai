@@ -1,41 +1,30 @@
 import type { Plan } from '@/types/database';
 
 export interface PlanLimits {
-  mealPlansPerMonth: number; // -1 = ilimitado
-  photoAnalysis: boolean;
-  chatMessagesPerDay: number; // -1 = ilimitado
+  mealPlansPerMonth: number; // -1 = ilimitado, 0 = bloqueado
+  photoAnalysisPerMonth: number;
+  chatMessagesPerMonth: number;
 }
 
+// Nenhum plano PRO é tecnicamente ilimitado — os limites abaixo existem
+// para proteger a margem (custo de IA por usuário). A comunicação ao
+// usuário deve dizer "uso amplo sujeito à política de uso justo", nunca
+// "ilimitado", para não contradizer isto.
 export const PLAN_LIMITS: Record<Plan, PlanLimits> = {
   free: {
     mealPlansPerMonth: 1,
-    photoAnalysis: false,
-    chatMessagesPerDay: 0, // sem acesso ao chat no plano free
+    photoAnalysisPerMonth: 0,
+    chatMessagesPerMonth: 0,
   },
   pro: {
-    mealPlansPerMonth: -1,
-    photoAnalysis: true,
-    chatMessagesPerDay: -1,
+    mealPlansPerMonth: 6,
+    photoAnalysisPerMonth: 30,
+    chatMessagesPerMonth: 300,
   },
 };
 
-export function canUseFeature(
-  plan: Plan,
-  feature: keyof PlanLimits,
-  currentUsage = 0
-): { allowed: boolean; reason?: string } {
-  const limits = PLAN_LIMITS[plan];
-  const limit = limits[feature];
-
-  if (typeof limit === 'boolean') {
-    return limit
-      ? { allowed: true }
-      : { allowed: false, reason: 'Recurso disponível apenas no plano PRO' };
-  }
-
-  if (limit === -1) return { allowed: true };
-  if (currentUsage >= limit) {
-    return { allowed: false, reason: `Limite do plano ${plan.toUpperCase()} atingido` };
-  }
-  return { allowed: true };
+export function featureLimitReason(plan: Plan, feature: keyof PlanLimits): string {
+  const limit = PLAN_LIMITS[plan][feature];
+  if (limit === 0) return 'Recurso disponível apenas no plano PRO';
+  return `Limite mensal do plano ${plan.toUpperCase()} atingido. Tente novamente no próximo mês ou fale com o suporte.`;
 }

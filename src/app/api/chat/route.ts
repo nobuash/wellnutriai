@@ -1,8 +1,9 @@
 import { MODELS, openai } from '@/lib/openai/client';
 import { formatKnowledgeContext, searchKnowledge } from '@/lib/knowledge/search';
 import { buildChatSystemPrompt } from '@/lib/openai/prompts';
-import { canUseFeature } from '@/lib/plans';
+import { featureLimitReason, PLAN_LIMITS } from '@/lib/plans';
 import { getUserEntitlement } from '@/lib/entitlement';
+import { checkDailyAiBudget, consumeUsageQuota, logAiUsage, monthKey } from '@/lib/aiUsage';
 import { findForbiddenFoods, isHighRiskCondition, mealPlanContentSchema } from '@/lib/mealPlanSafety';
 import { rateLimit } from '@/lib/ratelimit';
 import { createClient } from '@/lib/supabase/server';
@@ -16,6 +17,11 @@ export const maxDuration = 30;
 const bodySchema = z.object({
   message: z.string().min(1).max(2000),
 });
+
+// Mensagens curtas e sem conteúdo nutricional não precisam de busca
+// vetorial (RAG) — economiza uma chamada de embedding + busca por
+// requisição nesses casos, sem perder qualidade de resposta.
+const SIMPLE_MESSAGE_PATTERN = /^(oi+|ol[aá]|obrigad[oa]s?|valeu|entendi|ok(ay)?|blz|beleza|show|legal|👍|🙏)[\s!.,]*$/i;
 
 export async function POST(req: Request) {
   const supabase = createClient();
@@ -38,28 +44,26 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'Aceite os termos' }, { status: 403 });
   }
 
-  const entitlement = await getUserEntitlement(supabase, user.id);
-
   const json = await req.json().catch(() => ({}));
   const parsed = bodySchema.safeParse(json);
   if (!parsed.success) {
     return NextResponse.json({ error: 'Mensagem inválida' }, { status: 400 });
   }
 
-  // Limite diário por plano
-  const startOfDay = new Date();
-  startOfDay.setHours(0, 0, 0, 0);
+  const entitlement = await getUserEntitlement(supabase, user.id);
 
-  const { count } = await supabase
-    .from('chat_messages')
-    .select('*', { count: 'exact', head: true })
-    .eq('user_id', user.id)
-    .eq('role', 'user')
-    .gte('created_at', startOfDay.toISOString());
+  const budget = await checkDailyAiBudget();
+  if (!budget.allowed) {
+    return NextResponse.json({ error: 'Estamos com alta demanda no momento. Tente novamente mais tarde.' }, { status: 503 });
+  }
 
-  const check = canUseFeature(entitlement.plan, 'chatMessagesPerDay', count ?? 0);
-  if (!check.allowed) {
-    return NextResponse.json({ error: check.reason, upgrade: true }, { status: 402 });
+  const limit = PLAN_LIMITS[entitlement.plan].chatMessagesPerMonth;
+  const quota = await consumeUsageQuota(supabase, user.id, 'chat', monthKey(), limit);
+  if (!quota.allowed) {
+    return NextResponse.json(
+      { error: featureLimitReason(entitlement.plan, 'chatMessagesPerMonth'), upgrade: entitlement.plan === 'free' },
+      { status: 402 },
+    );
   }
 
   const [{ data: questionnaire }, { data: mealPlan }, { data: history }] = await Promise.all([
@@ -77,7 +81,8 @@ export async function POST(req: Request) {
 
   const mealPlanContent = (mealPlan?.content as MealPlanContent | undefined) ?? null;
 
-  const knowledgeChunks = await searchKnowledge(parsed.data.message);
+  const isSimpleMessage = SIMPLE_MESSAGE_PATTERN.test(parsed.data.message.trim());
+  const knowledgeChunks = isSimpleMessage ? [] : await searchKnowledge(parsed.data.message);
   const knowledgeContext = formatKnowledgeContext(knowledgeChunks);
 
   const systemPrompt = buildChatSystemPrompt(questionnaire, mealPlanContent, knowledgeContext);
@@ -87,20 +92,32 @@ export async function POST(req: Request) {
     content: m.message,
   }));
 
-  try {
-    await supabase.from('chat_messages').insert({
-      user_id: user.id, role: 'user', message: parsed.data.message,
-    });
+  const startedAt = Date.now();
 
+  await supabase.from('chat_messages').insert({
+    user_id: user.id, role: 'user', message: parsed.data.message,
+  });
+
+  try {
     const completion = await openai.chat.completions.create({
       model: MODELS.TEXT,
       response_format: { type: 'json_object' },
       temperature: 0.7,
+      max_tokens: 1200,
       messages: [
         { role: 'system', content: systemPrompt },
         ...historyMessages,
         { role: 'user', content: parsed.data.message },
       ],
+    });
+
+    void logAiUsage({
+      userId: user.id,
+      feature: 'chat',
+      model: MODELS.TEXT,
+      inputTokens: completion.usage?.prompt_tokens ?? 0,
+      outputTokens: completion.usage?.completion_tokens ?? 0,
+      latencyMs: Date.now() - startedAt,
     });
 
     const raw = completion.choices[0]?.message?.content ?? '{}';
@@ -155,6 +172,16 @@ export async function POST(req: Request) {
     return NextResponse.json({ reply, mealPlanUpdated });
   } catch (err) {
     console.error('[chat] error:', (err as Error).message);
+    void logAiUsage({
+      userId: user.id, feature: 'chat', model: MODELS.TEXT,
+      inputTokens: 0, outputTokens: 0, status: 'error', latencyMs: Date.now() - startedAt,
+    });
+    // A mensagem do usuário já foi salva acima — registra uma resposta
+    // de erro em vez de deixar a conversa com um balão sem resposta.
+    await supabase.from('chat_messages').insert({
+      user_id: user.id, role: 'ai',
+      message: 'Desculpe, tive um problema para responder agora. Tente reenviar sua mensagem em instantes.',
+    });
     return NextResponse.json({ error: 'Falha no chat' }, { status: 500 });
   }
 }

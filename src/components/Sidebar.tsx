@@ -99,7 +99,7 @@ export function Sidebar({ plan, name, isOpen, onClose }: SidebarProps) {
               <Sparkles className="h-4 w-4" />
               <span className="font-semibold text-sm">Upgrade para PRO</span>
             </div>
-            <p className="text-xs text-brand-50 mb-3">Planos ilimitados e análise por foto.</p>
+            <p className="text-xs text-brand-50 mb-3">Mais planos por mês, chat com IA e análise de refeição.</p>
             <Link
               href="/pricing"
               onClick={onClose}

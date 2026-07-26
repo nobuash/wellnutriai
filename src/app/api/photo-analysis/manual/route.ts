@@ -1,7 +1,8 @@
 import { MODELS, openai } from '@/lib/openai/client';
 import { MANUAL_ANALYSIS_PROMPT } from '@/lib/openai/prompts';
-import { canUseFeature } from '@/lib/plans';
+import { featureLimitReason, PLAN_LIMITS } from '@/lib/plans';
 import { getUserEntitlement } from '@/lib/entitlement';
+import { checkDailyAiBudget, consumeUsageQuota, logAiUsage, monthKey } from '@/lib/aiUsage';
 import { photoAnalysisResultSchema } from '@/lib/photoAnalysisSchema';
 import { createClient } from '@/lib/supabase/server';
 import { NextResponse } from 'next/server';
@@ -34,9 +35,21 @@ export async function POST(req: Request) {
   }
 
   const entitlement = await getUserEntitlement(supabase, user.id);
-  const check = canUseFeature(entitlement.plan, 'photoAnalysis');
-  if (!check.allowed) {
-    return NextResponse.json({ error: check.reason, upgrade: true }, { status: 402 });
+
+  const budget = await checkDailyAiBudget();
+  if (!budget.allowed) {
+    return NextResponse.json({ error: 'Estamos com alta demanda no momento. Tente novamente mais tarde.' }, { status: 503 });
+  }
+
+  // Mesmo balde de cota da análise por foto — é a mesma feature PRO,
+  // só com outra forma de entrada.
+  const limit = PLAN_LIMITS[entitlement.plan].photoAnalysisPerMonth;
+  const quota = await consumeUsageQuota(supabase, user.id, 'photo_analysis', monthKey(), limit);
+  if (!quota.allowed) {
+    return NextResponse.json(
+      { error: featureLimitReason(entitlement.plan, 'photoAnalysisPerMonth'), upgrade: entitlement.plan === 'free' },
+      { status: 402 },
+    );
   }
 
   const json = await req.json().catch(() => null);
@@ -50,10 +63,12 @@ export async function POST(req: Request) {
     .join('\n');
 
   try {
+    const startedAt = Date.now();
     const completion = await openai.chat.completions.create({
       model: MODELS.TEXT,
       response_format: { type: 'json_object' },
       temperature: 0.3,
+      max_tokens: 800,
       messages: [
         { role: 'system', content: 'Retorne apenas JSON válido conforme instruções.' },
         {
@@ -61,6 +76,15 @@ export async function POST(req: Request) {
           content: `${MANUAL_ANALYSIS_PROMPT}\n\nAlimentos informados:\n${foodsList}`,
         },
       ],
+    });
+
+    void logAiUsage({
+      userId: user.id,
+      feature: 'photo_analysis_manual',
+      model: MODELS.TEXT,
+      inputTokens: completion.usage?.prompt_tokens ?? 0,
+      outputTokens: completion.usage?.completion_tokens ?? 0,
+      latencyMs: Date.now() - startedAt,
     });
 
     const raw = completion.choices[0]?.message?.content;

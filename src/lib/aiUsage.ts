@@ -1,0 +1,145 @@
+import { createServiceClient } from '@/lib/supabase/service';
+import type { SupabaseClient } from '@supabase/supabase-js';
+
+export type AiFeature = 'meal_plan' | 'chat' | 'photo_analysis' | 'photo_analysis_manual';
+
+// Preços aproximados (USD por 1M tokens) — VERIFICAR contra a página de
+// pricing atual da OpenAI periodicamente, isso muda com frequência e
+// não há forma de buscar em tempo real sem uma chamada extra de API.
+const MODEL_PRICING_USD_PER_1M: Record<string, { input: number; output: number }> = {
+  'gpt-4.1-mini': { input: 0.40, output: 1.60 },
+  'gpt-4o': { input: 2.50, output: 10.00 },
+  'gpt-4o-mini': { input: 0.15, output: 0.60 },
+};
+
+// Câmbio aproximado USD->BRL usado só para estimar custo em reais nos
+// logs/orçamento. Configurável via env porque cotação real muda todo
+// dia; não é preciso, é só para dar ordem de grandeza ao circuit
+// breaker de orçamento.
+const USD_BRL_RATE = Number(process.env.USD_BRL_RATE) || 5.5;
+
+function estimateCostBRL(model: string, inputTokens: number, outputTokens: number): number {
+  const pricing = MODEL_PRICING_USD_PER_1M[model];
+  if (!pricing) return 0;
+  const usd = (inputTokens / 1_000_000) * pricing.input + (outputTokens / 1_000_000) * pricing.output;
+  return usd * USD_BRL_RATE;
+}
+
+interface LogAiUsageParams {
+  userId: string | null;
+  feature: AiFeature;
+  model: string;
+  inputTokens: number;
+  outputTokens: number;
+  status?: 'ok' | 'error';
+  latencyMs?: number;
+  requestId?: string | null;
+}
+
+/**
+ * Registra uso/custo de uma chamada de IA. Nunca lança — é
+ * best-effort, uma falha aqui não pode derrubar a feature principal.
+ * Nunca passe prompts, imagens ou texto do usuário: só metadados.
+ */
+export async function logAiUsage(params: LogAiUsageParams): Promise<void> {
+  try {
+    const service = createServiceClient();
+    const totalTokens = params.inputTokens + params.outputTokens;
+    const estimatedCost = estimateCostBRL(params.model, params.inputTokens, params.outputTokens);
+
+    await service.from('ai_usage_logs').insert({
+      user_id: params.userId,
+      feature: params.feature,
+      model: params.model,
+      input_tokens: params.inputTokens,
+      output_tokens: params.outputTokens,
+      total_tokens: totalTokens,
+      estimated_cost_brl: estimatedCost,
+      status: params.status ?? 'ok',
+      latency_ms: params.latencyMs ?? null,
+      request_id: params.requestId ?? null,
+    });
+  } catch (err) {
+    console.error('[aiUsage] falha ao registrar uso:', err);
+  }
+}
+
+interface BudgetCheck {
+  allowed: boolean;
+  spentTodayBRL: number;
+  dailyBudgetBRL: number | null;
+}
+
+/**
+ * Circuit breaker global de gasto diário com IA. Se
+ * AI_DAILY_BUDGET_BRL não estiver configurado (ou for 0), não há
+ * limite — a proteção só liga quando o valor é definido
+ * explicitamente, para não travar a aplicação sem aviso antes de
+ * alguém decidir o orçamento.
+ */
+export async function checkDailyAiBudget(): Promise<BudgetCheck> {
+  const dailyBudget = Number(process.env.AI_DAILY_BUDGET_BRL) || 0;
+  if (dailyBudget <= 0) {
+    return { allowed: true, spentTodayBRL: 0, dailyBudgetBRL: null };
+  }
+
+  try {
+    const service = createServiceClient();
+    const startOfDay = new Date();
+    startOfDay.setHours(0, 0, 0, 0);
+
+    const { data } = await service
+      .from('ai_usage_logs')
+      .select('estimated_cost_brl')
+      .gte('created_at', startOfDay.toISOString());
+
+    const spent = (data ?? []).reduce((sum, row) => sum + Number(row.estimated_cost_brl ?? 0), 0);
+
+    if (spent >= dailyBudget) {
+      console.error(`[aiUsage] ALERTA: orçamento diário de IA estourado — gasto R$${spent.toFixed(2)} / limite R$${dailyBudget.toFixed(2)}`);
+    }
+
+    return { allowed: spent < dailyBudget, spentTodayBRL: spent, dailyBudgetBRL: dailyBudget };
+  } catch (err) {
+    console.error('[aiUsage] falha ao checar orçamento diário — permitindo por padrão:', err);
+    return { allowed: true, spentTodayBRL: 0, dailyBudgetBRL: dailyBudget };
+  }
+}
+
+/**
+ * Consome uma unidade de cota de uso de forma atômica via RPC
+ * Postgres (consume_usage_quota) — evita a corrida de "SELECT count
+ * depois INSERT" que duas requisições simultâneas poderiam furar.
+ * limit < 0 = ilimitado.
+ */
+export async function consumeUsageQuota(
+  supabase: SupabaseClient,
+  userId: string,
+  feature: string,
+  periodKey: string,
+  limit: number,
+): Promise<{ allowed: boolean; currentCount: number }> {
+  const { data, error } = await supabase
+    .rpc('consume_usage_quota', {
+      p_user_id: userId,
+      p_feature: feature,
+      p_period_key: periodKey,
+      p_limit: limit,
+    })
+    .single<{ allowed: boolean; current_count: number }>();
+
+  if (error || !data) {
+    console.error('[aiUsage] falha ao consumir cota, bloqueando por segurança:', error);
+    return { allowed: false, currentCount: 0 };
+  }
+
+  return { allowed: data.allowed, currentCount: data.current_count };
+}
+
+export function monthKey(date = new Date()): string {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+}
+
+export function dayKey(date = new Date()): string {
+  return date.toISOString().slice(0, 10);
+}

@@ -13,7 +13,7 @@ export default function PaymentSuccessPage() {
         <h1 className="text-2xl font-bold">Pagamento confirmado!</h1>
         <p className="text-slate-500">
           Bem-vindo ao <strong>WellNutriAI PRO</strong>. Sua assinatura foi ativada com sucesso.
-          Aproveite planos ilimitados, chat sem restrições e análise por foto.
+          Aproveite mais planos alimentares por mês, chat com IA e análise de refeição.
         </p>
         <p className="text-xs text-slate-400">
           O plano pode levar alguns instantes para ser atualizado. Se ainda aparecer como Free,

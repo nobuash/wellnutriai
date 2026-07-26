@@ -100,7 +100,7 @@ export default function ChatPage() {
             <h2 className="text-xl font-bold">Recurso exclusivo PRO</h2>
             <p className="text-slate-500 mt-1 max-w-sm mx-auto">
               O chat com IA está disponível apenas no plano PRO. Faça upgrade para conversar
-              com a IA sobre seu plano alimentar sem limites.
+              com a IA sobre seu plano alimentar.
             </p>
           </div>
           <Link href="/pricing">

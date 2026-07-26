@@ -145,7 +145,7 @@ export default function PricingPage() {
           <h3 className="font-bold text-lg mb-1">Free</h3>
           <p className="text-3xl font-bold mb-6">R$ 0</p>
           <ul className="space-y-2 mb-6">
-            {['1 plano alimentar por mês', 'Chat limitado (10 mensagens/dia)', 'Sem análise por foto'].map((f) => (
+            {['1 plano alimentar por mês', 'Sem chat com IA', 'Sem análise de refeição'].map((f) => (
               <li key={f} className="flex items-center gap-2 text-sm text-slate-700">
                 <Check className="h-4 w-4 text-brand-600 shrink-0" />{f}
               </li>
@@ -214,7 +214,7 @@ export default function PricingPage() {
           )}
 
           <ul className="space-y-2 mb-6 mt-4">
-            {['Planos ilimitados e editáveis', 'Chat IA sem limites', 'Análise por foto', 'Suporte prioritário'].map((f) => (
+            {['Até 6 planos alimentares por mês, editáveis pelo chat', 'Chat com IA — uso amplo, sujeito à política de uso justo', 'Até 30 análises de refeição por mês (foto ou manual)', 'Suporte prioritário'].map((f) => (
               <li key={f} className="flex items-center gap-2 text-sm text-slate-700">
                 <Check className="h-4 w-4 text-brand-600 shrink-0" />{f}
               </li>
