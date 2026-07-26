@@ -1,4 +1,5 @@
 import { getPreference, PLANS, type PlanInterval } from '@/lib/mercadopago/client';
+import { checkDistributedRateLimit } from '@/lib/distributedRateLimit';
 import { createClient } from '@/lib/supabase/server';
 import { NextResponse } from 'next/server';
 
@@ -10,6 +11,11 @@ export async function POST(req: Request) {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) {
     return NextResponse.json({ error: 'Não autenticado' }, { status: 401 });
+  }
+
+  // Rate limit distribuído: 10 tentativas por hora por usuário
+  if (!(await checkDistributedRateLimit(supabase, `payment-subscribe:${user.id}`, 10, 3600))) {
+    return NextResponse.json({ error: 'Muitas tentativas. Tente novamente em breve.' }, { status: 429 });
   }
 
   const body = await req.json().catch(() => ({})) as { planInterval?: string };

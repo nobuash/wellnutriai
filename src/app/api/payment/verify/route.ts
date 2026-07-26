@@ -1,5 +1,7 @@
 import { getPayment, PLANS, type PlanInterval } from '@/lib/mercadopago/client';
+import { checkDistributedRateLimit } from '@/lib/distributedRateLimit';
 import { createClient } from '@/lib/supabase/server';
+import { createServiceClient } from '@/lib/supabase/service';
 import { NextResponse } from 'next/server';
 
 export const runtime = 'nodejs';
@@ -10,6 +12,13 @@ export async function POST(req: Request) {
   const supabase = createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: 'Não autenticado' }, { status: 401 });
+
+  // Rate limit distribuído. A UI já faz polling automático a cada 5s
+  // por até 30min enquanto o modal do PIX está aberto (~360 chamadas),
+  // então o limite precisa folgar bastante acima disso.
+  if (!(await checkDistributedRateLimit(supabase, `payment-verify:${user.id}`, 500, 3600))) {
+    return NextResponse.json({ error: 'Muitas tentativas. Tente novamente em breve.' }, { status: 429 });
+  }
 
   const { payment_id } = await req.json().catch(() => ({})) as { payment_id?: number };
   if (!payment_id) return NextResponse.json({ error: 'payment_id obrigatório' }, { status: 400 });
@@ -41,7 +50,11 @@ export async function POST(req: Request) {
     const expiresAt = new Date();
     expiresAt.setDate(expiresAt.getDate() + durationDays);
 
-    await supabase.from('subscriptions').upsert(
+    // subscriptions e profiles.plan só aceitam escrita via service_role
+    // (RLS + trigger protect_plan_column).
+    const service = createServiceClient();
+
+    await service.from('subscriptions').upsert(
       {
         user_id: user.id,
         plan: 'pro',
@@ -61,7 +74,7 @@ export async function POST(req: Request) {
       { onConflict: 'mp_subscription_id' }
     );
 
-    await supabase.from('profiles').update({ plan: 'pro' }).eq('id', user.id);
+    await service.from('profiles').update({ plan: 'pro' }).eq('id', user.id);
 
     console.log(`[verify] user=${user.id} plano ativado via verificação manual, expira ${expiresAt.toISOString()}`);
 

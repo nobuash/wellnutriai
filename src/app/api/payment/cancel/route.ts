@@ -1,5 +1,6 @@
 import { getPreApproval } from '@/lib/mercadopago/client';
 import { getStripe } from '@/lib/stripe/client';
+import { checkDistributedRateLimit } from '@/lib/distributedRateLimit';
 import { createClient } from '@/lib/supabase/server';
 import { createServiceClient } from '@/lib/supabase/service';
 import { NextResponse } from 'next/server';
@@ -34,6 +35,10 @@ export async function POST() {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) {
     return NextResponse.json({ error: 'Não autenticado' }, { status: 401 });
+  }
+
+  if (!(await checkDistributedRateLimit(supabase, `payment-cancel:${user.id}`, 10, 3600))) {
+    return NextResponse.json({ error: 'Muitas tentativas. Tente novamente em breve.' }, { status: 429 });
   }
 
   const { data: sub } = await supabase

@@ -1,5 +1,7 @@
 import { getPayment, PLANS, type PlanInterval } from '@/lib/mercadopago/client';
+import { checkDistributedRateLimit } from '@/lib/distributedRateLimit';
 import { createClient } from '@/lib/supabase/server';
+import { createServiceClient } from '@/lib/supabase/service';
 import { NextResponse } from 'next/server';
 
 export const runtime = 'nodejs';
@@ -8,6 +10,11 @@ export async function POST(req: Request) {
   const supabase = createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: 'Não autenticado' }, { status: 401 });
+
+  // Rate limit distribuído: 10 tentativas de gerar PIX por hora por usuário
+  if (!(await checkDistributedRateLimit(supabase, `payment-pix:${user.id}`, 10, 3600))) {
+    return NextResponse.json({ error: 'Muitas tentativas. Tente novamente em breve.' }, { status: 429 });
+  }
 
   const body = await req.json().catch(() => ({})) as { planInterval?: string };
   const planInterval: PlanInterval =
@@ -57,7 +64,9 @@ export async function POST(req: Request) {
       throw new Error('QR code não retornado pelo Mercado Pago');
     }
 
-    await supabase.from('subscriptions').upsert(
+    // subscriptions só aceita escrita via service_role (RLS) — ver
+    // 007_normalize_subscriptions.sql.
+    await createServiceClient().from('subscriptions').upsert(
       {
         user_id: user.id,
         plan: 'pro',
