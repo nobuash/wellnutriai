@@ -76,11 +76,32 @@ export async function POST(req: NextRequest) {
           mp_status: 'authorized',
           payment_type: 'card',
           expires_at: expiresAt.toISOString(),
+          provider: 'stripe',
+          provider_subscription_id: subscriptionId,
+          provider_customer_id: typeof sub.customer === 'string' ? sub.customer : sub.customer?.id ?? null,
+          status: 'active',
+          billing_interval: planInterval,
+          current_period_end: expiresAt.toISOString(),
+          cancel_at_period_end: sub.cancel_at_period_end ?? false,
+          canceled_at: null,
         },
         { onConflict: 'mp_subscription_id' }
       );
       await db.from('profiles').update({ plan: 'pro' }).eq('id', userId);
       console.log(`[stripe/webhook] renovação user=${userId} sub=${subscriptionId} expira=${expiresAt.toISOString()}`);
+    }
+
+    // Falha de cobrança (cartão recusado na renovação)
+    if (event.type === 'invoice.payment_failed') {
+      const invoice = event.data.object as Stripe.Invoice;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const subscriptionId = (invoice as any).subscription as string;
+      if (!subscriptionId) return NextResponse.json({ ok: true });
+
+      await db.from('subscriptions')
+        .update({ status: 'payment_failed', mp_status: 'cancelled' })
+        .eq('mp_subscription_id', subscriptionId);
+      console.log(`[stripe/webhook] falha de pagamento sub=${subscriptionId}`);
     }
 
     // Assinatura cancelada ou expirada
@@ -91,10 +112,19 @@ export async function POST(req: NextRequest) {
       if (!userId) return NextResponse.json({ ok: true });
 
       await db.from('subscriptions')
-        .update({ mp_status: 'cancelled' })
+        .update({ mp_status: 'cancelled', status: 'canceled', canceled_at: new Date().toISOString() })
         .eq('mp_subscription_id', sub.id);
       await db.from('profiles').update({ plan: 'free' }).eq('id', userId);
       console.log(`[stripe/webhook] cancelamento user=${userId} sub=${sub.id}`);
+    }
+
+    // Assinatura marcada para cancelar ao fim do período (usuário clicou cancelar)
+    // ou teve o cancel_at_period_end revertido — mantém o banco em sincronia com a Stripe.
+    if (event.type === 'customer.subscription.updated') {
+      const sub = event.data.object as Stripe.Subscription;
+      await db.from('subscriptions')
+        .update({ cancel_at_period_end: sub.cancel_at_period_end ?? false })
+        .eq('mp_subscription_id', sub.id);
     }
 
     return NextResponse.json({ ok: true });

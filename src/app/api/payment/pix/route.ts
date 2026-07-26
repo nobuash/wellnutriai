@@ -64,6 +64,11 @@ export async function POST(req: Request) {
         mp_subscription_id: String(result.id),
         mp_status: 'pending',
         payment_type: 'pix',
+        provider: 'mercadopago',
+        provider_subscription_id: String(result.id),
+        provider_payment_id: String(result.id),
+        status: 'pending',
+        billing_interval: planInterval,
       },
       { onConflict: 'mp_subscription_id' }
     );

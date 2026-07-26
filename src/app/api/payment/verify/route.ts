@@ -49,6 +49,14 @@ export async function POST(req: Request) {
         mp_status: 'authorized',
         payment_type: payment.payment_method_id === 'pix' ? 'pix' : 'card',
         expires_at: expiresAt.toISOString(),
+        provider: 'mercadopago',
+        provider_subscription_id: String(payment.id),
+        provider_payment_id: String(payment.id),
+        status: 'active',
+        billing_interval: planInterval,
+        current_period_end: expiresAt.toISOString(),
+        cancel_at_period_end: false,
+        canceled_at: null,
       },
       { onConflict: 'mp_subscription_id' }
     );

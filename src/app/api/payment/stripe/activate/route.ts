@@ -57,6 +57,14 @@ export async function POST(req: Request) {
         mp_status: 'authorized',
         payment_type: 'card',
         expires_at: expiresAt.toISOString(),
+        provider: 'stripe',
+        provider_subscription_id: subscriptionId,
+        provider_customer_id: typeof session.customer === 'string' ? session.customer : session.customer?.id ?? null,
+        status: 'active',
+        billing_interval: planInterval,
+        current_period_end: expiresAt.toISOString(),
+        cancel_at_period_end: false,
+        canceled_at: null,
       },
       { onConflict: 'mp_subscription_id' }
     );
