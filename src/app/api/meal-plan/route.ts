@@ -2,6 +2,7 @@ import { MODELS, openai } from '@/lib/openai/client';
 import { formatKnowledgeContext, searchKnowledge } from '@/lib/knowledge/search';
 import { buildMealPlanPrompt, LEGAL_DISCLAIMER } from '@/lib/openai/prompts';
 import { canUseFeature } from '@/lib/plans';
+import { getUserEntitlement } from '@/lib/entitlement';
 import { rateLimit } from '@/lib/ratelimit';
 import { createClient } from '@/lib/supabase/server';
 import type { MealPlanContent, NutritionQuestionnaire } from '@/types/database';
@@ -23,13 +24,15 @@ export async function POST() {
 
   const { data: profile } = await supabase
     .from('profiles')
-    .select('plan, accepted_terms')
+    .select('accepted_terms')
     .eq('id', user.id)
     .single();
 
   if (!profile?.accepted_terms) {
     return NextResponse.json({ error: 'Aceite os termos antes de usar' }, { status: 403 });
   }
+
+  const entitlement = await getUserEntitlement(supabase, user.id);
 
   const startOfMonth = new Date();
   startOfMonth.setDate(1);
@@ -41,7 +44,7 @@ export async function POST() {
     .eq('user_id', user.id)
     .gte('created_at', startOfMonth.toISOString());
 
-  const check = canUseFeature(profile.plan, 'mealPlansPerMonth', count ?? 0);
+  const check = canUseFeature(entitlement.plan, 'mealPlansPerMonth', count ?? 0);
   if (!check.allowed) {
     return NextResponse.json({ error: check.reason, upgrade: true }, { status: 402 });
   }

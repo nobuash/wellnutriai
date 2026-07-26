@@ -1,6 +1,7 @@
 import { MODELS, openai } from '@/lib/openai/client';
 import { PHOTO_ANALYSIS_PROMPT } from '@/lib/openai/prompts';
 import { canUseFeature } from '@/lib/plans';
+import { getUserEntitlement } from '@/lib/entitlement';
 import { rateLimit } from '@/lib/ratelimit';
 import { createClient } from '@/lib/supabase/server';
 import type { PhotoAnalysisResult } from '@/types/database';
@@ -47,7 +48,7 @@ export async function POST(req: Request) {
 
   const { data: profile } = await supabase
     .from('profiles')
-    .select('plan, accepted_terms')
+    .select('accepted_terms')
     .eq('id', user.id)
     .single();
 
@@ -55,7 +56,8 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'Aceite os termos' }, { status: 403 });
   }
 
-  const check = canUseFeature(profile.plan, 'photoAnalysis');
+  const entitlement = await getUserEntitlement(supabase, user.id);
+  const check = canUseFeature(entitlement.plan, 'photoAnalysis');
   if (!check.allowed) {
     return NextResponse.json({ error: check.reason, upgrade: true }, { status: 402 });
   }
