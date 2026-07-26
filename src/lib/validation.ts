@@ -32,7 +32,7 @@ export const resetPasswordSchema = z.object({
 });
 
 export const questionnaireSchema = z.object({
-  age: z.coerce.number().int().min(12).max(100),
+  age: z.coerce.number().int().min(18, 'É preciso ter 18 anos ou mais').max(100),
   weight: z.coerce.number().min(30).max(300),
   height: z.coerce.number().min(100).max(250),
   body_fat: z.preprocess(

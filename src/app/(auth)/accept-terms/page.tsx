@@ -70,15 +70,21 @@ export default function AcceptTermsPage() {
             As sugestões alimentares <strong>não devem ser interpretadas como prescrição dietética</strong>.
           </li>
           <li>
-            O uso das informações é de <strong>total responsabilidade do usuário</strong>.
+            O usuário é responsável por avaliar criticamente e, sempre que necessário, validar as sugestões com
+            um profissional de saúde antes de segui-las.
           </li>
           <li>
-            O WellNutriAI <strong>não se responsabiliza por quaisquer danos, problemas de saúde ou consequências
-            decorrentes do uso das recomendações</strong>.
+            Na máxima medida permitida pela legislação aplicável, o WellNutriAI não se responsabiliza por danos
+            decorrentes do uso inadequado das recomendações ou do não acompanhamento profissional recomendado
+            neste termo — isso não afasta direitos que a lei não permita renunciar.
           </li>
           <li>
             Em caso de condições médicas, alergias severas ou necessidades específicas, o usuário deve procurar
             um profissional qualificado.
+          </li>
+          <li>
+            O WellNutriAI é destinado a <strong>maiores de 18 anos</strong>. Não geramos planos alimentares
+            personalizados para menores de idade.
           </li>
         </ol>
 
