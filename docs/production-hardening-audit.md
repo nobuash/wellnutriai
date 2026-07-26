@@ -130,7 +130,54 @@ condição de corrida sob requisições simultâneas.
 
 ## Status de execução
 
-Ver `TodoWrite` da sessão e os commits em `fix/production-hardening` para o que foi de fato
-implementado. Cada commit corresponde a um item específico desta lista. O relatório final (ao fim
-do trabalho) marca cada item como `IMPLEMENTADO E TESTADO`, `IMPLEMENTADO MAS EXIGE CONFIGURAÇÃO
-EXTERNA`, `NÃO IMPLEMENTADO` ou `RISCO RESTANTE`.
+Legenda: 🟢 implementado e verificado por build/typecheck (não há suite de testes automatizados —
+"verificado" aqui significa compilação limpa e revisão de código, não execução real contra
+Stripe/Mercado Pago/Supabase de produção) · 🟡 implementado mas exige configuração externa (conta,
+chave, painel) que esta sessão não tem acesso para fazer · 🔴 não implementado · ⚪ risco restante
+documentado, decisão do time.
+
+| # | Item | Status |
+|---|---|---|
+| 1 | Cancelamento não chamava o provedor real | 🟢 corrigido — `src/app/api/payment/cancel/route.ts` |
+| 2 | `profiles.plan` nunca expira | 🟢 corrigido — `src/lib/entitlement.ts`, self-healing |
+| 3 | `subscriptions` mistura IDs Stripe/MP | 🟢 normalizado (aditivo) — `007_normalize_subscriptions.sql` |
+| 4 | RLS de `subscriptions` permitia update livre pelo usuário | 🟢 corrigido — mesma migration 007 |
+| 5 | Sem UI de cancelamento | 🟢 construída — `/pricing`, `GET /api/entitlement` |
+| 6 | `accepted_terms_at` nunca persistia | 🟢 corrigido — `/api/accept-terms` (service role) |
+| 7 | Gate de termos usava `user_metadata` (bypassável) | 🟢 corrigido — lê `profiles.accepted_terms` |
+| 8 | Idade mínima 12 em vez de 18 | 🟢 corrigido (Zod + constraint `NOT VALID`) |
+| 9 | Geração automatizada para diabetes | 🟢 bloqueada — `mealPlanSafety.ts` |
+| 10 | Sem validação de alergia pós-geração | 🟢 implementada — `findForbiddenFoods` + retry único |
+| 11 | Resposta da IA sem validação de schema | 🟢 Zod em meal-plan, chat, photo-analysis (foto e manual) |
+| 12 | Sem log de custo de IA | 🟢 `ai_usage_logs` + `logAiUsage` |
+| 13 | Sem circuit breaker de orçamento | 🟢 diário (global) + mensal (por usuário), ambos opt-in |
+| 14 | Cotas com race condition (count→insert) | 🟢 RPC atômica `consume_usage_quota` |
+| 15 | PRO "ilimitado" na prática e na comunicação | 🟢 limites reais definidos + copy corrigida em todo o app |
+| 16 | Rate limit só em memória | 🟡 parcial — RPC distribuída aplicada às rotas de pagamento; login/signup/reset dependem do rate limit nativo do Supabase Auth (não há rota própria para interceptar) |
+| 17 | Signed URL temporária salva permanentemente | 🟢 corrigido — grava `path`, gera signed URL sob demanda (não implementado: geração sob demanda em si, pois nenhuma tela exibe a foto hoje) |
+| 18 | Sem exclusão de conta | 🟢 `/account` + `/api/account/delete` |
+| 19 | PWA cacheava rotas autenticadas/API | 🟢 corrigido — `runtimeCaching` restrito a assets estáticos |
+| 20 | CSP com `unsafe-eval`/`unsafe-inline` | ⚪ não alterado — risco de quebrar Stripe/MP sem ambiente de teste para validar; documentado em `docs/security.md` |
+| 21 | Cloudflare Turnstile no cadastro | 🔴 não implementado — pacote instalado, zero uso no código; precisa de conta Cloudflare |
+| 22 | Observabilidade (Sentry) | 🔴 não implementado — precisa de conta Sentry + `npm install @sentry/nextjs` |
+| 23 | `water_logs` sem migration correspondente | 🟢 documentada retroativamente — `012_document_water_logs.sql` |
+| 24 | Testes automatizados (unitários, integração, RLS, Playwright, k6) | 🔴 não implementados — nenhum framework de teste no projeto |
+| 25 | CI (type-check/lint/build) | 🟢 `.github/workflows/ci.yml` |
+| 26 | Validação de env obrigatório no boot | 🟢 `next.config.js`, falha o build |
+| 27 | `.env.example` desatualizado | 🟢 reescrito refletindo todo `process.env.*` usado no código |
+| 28 | Documentação (README, docs/*) | 🟢 reescritos/criados |
+| 29 | Menores de idade nos Termos de Uso | 🟢 linha adicionada |
+| 30 | Cláusula de responsabilidade possivelmente abusiva (CDC) | ⚪ suavizada, mas **isto não é uma revisão jurídica** — recomenda-se revisão por advogado antes de contar com a proteção legal do termo |
+| 31 | Exportação de dados do usuário | 🔴 não implementada |
+| 32 | Retenção/expiração automática de fotos antigas | 🔴 não implementada |
+
+### Riscos restantes que exigem decisão ou ação do mantenedor
+
+- Rodar as migrations `007`–`012` em produção (nenhuma foi aplicada pela sessão — sem acesso
+  direto ao banco). Ver `docs/deployment-checklist.md`.
+- Configurar `invoice.payment_failed` e `customer.subscription.updated` no webhook da Stripe.
+- Decidir e configurar `AI_DAILY_BUDGET_BRL` / `AI_USER_MONTHLY_BUDGET_BRL` — hoje desligados.
+- Revisar juridicamente o termo de responsabilidade (item 30).
+- Integrar Turnstile e Sentry quando houver as contas correspondentes.
+- Testar manualmente o checklist de smoke test em `docs/deployment-checklist.md` — nada disso foi
+  executado contra Stripe/Mercado Pago/Supabase reais nesta sessão, só compilado e revisado.
