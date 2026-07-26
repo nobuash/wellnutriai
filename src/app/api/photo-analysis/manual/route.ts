@@ -2,6 +2,7 @@ import { MODELS, openai } from '@/lib/openai/client';
 import { MANUAL_ANALYSIS_PROMPT } from '@/lib/openai/prompts';
 import { canUseFeature } from '@/lib/plans';
 import { getUserEntitlement } from '@/lib/entitlement';
+import { photoAnalysisResultSchema } from '@/lib/photoAnalysisSchema';
 import { createClient } from '@/lib/supabase/server';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
@@ -65,7 +66,12 @@ export async function POST(req: Request) {
     const raw = completion.choices[0]?.message?.content;
     if (!raw) throw new Error('IA não retornou conteúdo');
 
-    const result = JSON.parse(raw);
+    const parsedResult = photoAnalysisResultSchema.safeParse(JSON.parse(raw));
+    if (!parsedResult.success) {
+      console.error('[photo-analysis/manual] resposta da IA fora do schema:', parsedResult.error.flatten());
+      return NextResponse.json({ error: 'Não foi possível interpretar a análise. Tente novamente.' }, { status: 502 });
+    }
+    const result = parsedResult.data;
 
     // Salva no histórico reutilizando a mesma tabela
     await supabase.from('meal_photo_analysis').insert({
