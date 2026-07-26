@@ -1,6 +1,7 @@
 import { getPreApproval } from '@/lib/mercadopago/client';
 import { getStripe } from '@/lib/stripe/client';
 import { checkDistributedRateLimit } from '@/lib/distributedRateLimit';
+import { recalculateVisualPlanCache } from '@/lib/subscriptionCache';
 import { createClient } from '@/lib/supabase/server';
 import { createServiceClient } from '@/lib/supabase/service';
 import { NextResponse } from 'next/server';
@@ -41,41 +42,54 @@ export async function POST() {
     return NextResponse.json({ error: 'Muitas tentativas. Tente novamente em breve.' }, { status: 429 });
   }
 
-  const { data: sub } = await supabase
+  // Busca especificamente uma assinatura RECORRENTE ativa — não "a
+  // linha mais recente" (que poderia ser um PIX pendente mais novo
+  // escondendo uma assinatura Stripe ativa mais antiga; ver
+  // src/lib/entitlement.ts). Cancelamento só faz sentido para isso.
+  const { data: activeSub } = await supabase
     .from('subscriptions')
     .select('id, provider, provider_subscription_id, payment_type, status, current_period_end, cancel_at_period_end')
     .eq('user_id', user.id)
+    .eq('status', 'active')
+    .eq('payment_type', 'subscription')
     .order('created_at', { ascending: false })
     .limit(1)
     .maybeSingle<SubscriptionRow>();
 
-  if (!sub) {
-    return NextResponse.json({ error: 'Nenhuma assinatura encontrada para este usuário.' }, { status: 400 });
+  if (activeSub?.cancel_at_period_end) {
+    return NextResponse.json({ ok: true, alreadyCanceled: true, accessUntil: activeSub.current_period_end });
   }
 
-  // Idempotente: já cancelada (ou marcada para cancelar) — não repete a chamada ao provedor.
-  if (sub.status === 'canceled' || sub.cancel_at_period_end) {
-    return NextResponse.json({
-      ok: true,
-      alreadyCanceled: true,
-      accessUntil: sub.current_period_end,
-    });
+  if (!activeSub) {
+    // Sem assinatura recorrente ativa — mensagem depende de existir
+    // algum pagamento avulso (PIX/cartão) sem renovação automática.
+    const { data: anySub } = await supabase
+      .from('subscriptions')
+      .select('id, status, payment_type, current_period_end')
+      .eq('user_id', user.id)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (anySub && anySub.status === 'canceled') {
+      return NextResponse.json({ ok: true, alreadyCanceled: true, accessUntil: anySub.current_period_end });
+    }
+
+    if (anySub && anySub.payment_type !== 'subscription') {
+      return NextResponse.json(
+        {
+          error:
+            'Este pagamento não tem renovação automática, então não há assinatura para cancelar. ' +
+            'Seu acesso PRO continua válido até a data de expiração — para renovar, é preciso pagar novamente.',
+        },
+        { status: 400 },
+      );
+    }
+
+    return NextResponse.json({ error: 'Nenhuma assinatura ativa encontrada.' }, { status: 400 });
   }
 
-  // PIX ou cartão avulso do Mercado Pago não são cobrança recorrente — não existe nada
-  // para cancelar no provedor. Nunca afirme que "cancelamos" uma cobrança que não existe.
-  if (sub.provider === 'mercadopago' && sub.payment_type !== 'subscription') {
-    return NextResponse.json(
-      {
-        error:
-          'Este pagamento não tem renovação automática, então não há assinatura para cancelar. ' +
-          'Seu acesso PRO continua válido até a data de expiração — para renovar, é preciso pagar novamente.',
-      },
-      { status: 400 },
-    );
-  }
-
-  if (sub.status !== 'active' || !sub.provider_subscription_id) {
+  if (!activeSub.provider_subscription_id) {
     return NextResponse.json({ error: 'Nenhuma assinatura ativa encontrada.' }, { status: 400 });
   }
 
@@ -86,9 +100,9 @@ export async function POST() {
   const service = createServiceClient();
 
   try {
-    if (sub.provider === 'stripe') {
+    if (activeSub.provider === 'stripe') {
       const stripe = getStripe();
-      const updated = await stripe.subscriptions.update(sub.provider_subscription_id, {
+      const updated = await stripe.subscriptions.update(activeSub.provider_subscription_id, {
         cancel_at_period_end: true,
       });
 
@@ -98,7 +112,7 @@ export async function POST() {
       await service
         .from('subscriptions')
         .update({ cancel_at_period_end: true })
-        .eq('id', sub.id);
+        .eq('id', activeSub.id);
 
       await logCancelAudit(service, user.id, { provider: 'stripe', subscription_id: 'masked' });
 
@@ -106,27 +120,27 @@ export async function POST() {
       const stripePeriodEndSec = updated.items.data[0]?.current_period_end;
       const periodEnd = stripePeriodEndSec
         ? new Date(stripePeriodEndSec * 1000).toISOString()
-        : sub.current_period_end;
+        : activeSub.current_period_end;
 
       return NextResponse.json({ ok: true, cancelAtPeriodEnd: true, accessUntil: periodEnd });
     }
 
-    if (sub.provider === 'mercadopago') {
+    if (activeSub.provider === 'mercadopago') {
       // Cancelamento de assinatura recorrente real do Mercado Pago (preapproval).
       // Nenhum fluxo atual do produto cria uma preapproval de verdade (hoje PIX e
       // cartão MP são pagamentos avulsos), mas o caminho fica pronto e correto
       // para quando essa opção existir.
       await getPreApproval().update({
-        id: sub.provider_subscription_id,
+        id: activeSub.provider_subscription_id,
         body: { status: 'cancelled' },
       });
 
       await service
         .from('subscriptions')
         .update({ status: 'canceled', mp_status: 'cancelled', canceled_at: new Date().toISOString() })
-        .eq('id', sub.id);
+        .eq('id', activeSub.id);
 
-      await service.from('profiles').update({ plan: 'free' }).eq('id', user.id);
+      await recalculateVisualPlanCache(service, user.id);
       await logCancelAudit(service, user.id, { provider: 'mercadopago', subscription_id: 'masked' });
 
       return NextResponse.json({ ok: true, cancelAtPeriodEnd: false, accessUntil: null });
