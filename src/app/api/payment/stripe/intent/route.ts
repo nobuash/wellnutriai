@@ -1,41 +1,20 @@
-import { getStripe, STRIPE_INTERVALS } from '@/lib/stripe/client';
+import { getStripe, getStripePriceId, STRIPE_INTERVALS } from '@/lib/stripe/client';
 import { type PlanInterval } from '@/lib/mercadopago/client';
 import { checkDistributedRateLimit } from '@/lib/distributedRateLimit';
 import { consentReasonMessage, requireCurrentConsent } from '@/lib/consentCheck';
 import { findActiveStripeSubscription } from '@/lib/stripe/activateSubscription';
 import { createClient } from '@/lib/supabase/server';
+import { createServiceClient } from '@/lib/supabase/service';
 import { NextResponse } from 'next/server';
 
 export const runtime = 'nodejs';
 
-async function getOrCreatePrice(planInterval: PlanInterval) {
-  const stripe = getStripe();
-  const config = STRIPE_INTERVALS[planInterval];
-
-  const products = await stripe.products.search({
-    query: 'name:"WellNutriAI PRO" AND active:"true"',
-    limit: 1,
-  });
-  const product = products.data[0]
-    ?? await stripe.products.create({ name: 'WellNutriAI PRO' });
-
-  const prices = await stripe.prices.list({ product: product.id, active: true, limit: 20 });
-  const existing = prices.data.find(
-    (p) =>
-      p.unit_amount === config.amountCents &&
-      p.currency === 'brl' &&
-      p.recurring?.interval === config.interval &&
-      p.recurring?.interval_count === config.interval_count
-  );
-
-  return existing ?? await stripe.prices.create({
-    product: product.id,
-    currency: 'brl',
-    unit_amount: config.amountCents,
-    recurring: { interval: config.interval, interval_count: config.interval_count },
-    nickname: config.label,
-  });
-}
+// Janela para o usuário concluir o checkout antes da reserva expirar e
+// liberar uma nova tentativa. Não precisa ser exata — só precisa ser
+// curta o bastante pra não travar alguém que desistiu, e longa o
+// bastante pra não expirar no meio de um checkout legítimo em
+// andamento.
+const RESERVATION_TTL_MINUTES = 15;
 
 export async function POST(req: Request) {
   const supabase = createClient();
@@ -55,8 +34,9 @@ export async function POST(req: Request) {
   const { planInterval = 'monthly' } = await req.json().catch(() => ({})) as { planInterval?: PlanInterval };
   if (!STRIPE_INTERVALS[planInterval]) return NextResponse.json({ error: 'Plano inválido' }, { status: 400 });
 
-  // Impede duas assinaturas recorrentes simultâneas — antes, nada
-  // aqui checava se o usuário já tinha uma ativa antes de criar outra.
+  // Impede duas assinaturas recorrentes simultâneas — checagem inicial
+  // (não atômica sozinha, ver reserva abaixo para a defesa real contra
+  // concorrência).
   const existingSub = await findActiveStripeSubscription(user.id);
   if (existingSub) {
     return NextResponse.json(
@@ -65,6 +45,75 @@ export async function POST(req: Request) {
         code: 'ACTIVE_SUBSCRIPTION_EXISTS',
         manageSubscription: true,
       },
+      { status: 409 },
+    );
+  }
+
+  const service = createServiceClient();
+
+  // Reserva atômica: só uma linha 'reserved'/'session_created' por
+  // (user_id, provider) pode existir por vez (índice único parcial em
+  // 023_checkout_reservations.sql). Duplo clique ou duas abas — a
+  // segunda requisição esbarra no índice, não cria uma segunda
+  // Checkout Session.
+  const { data: reservation, error: reserveError } = await service
+    .from('checkout_reservations')
+    .insert({
+      user_id: user.id,
+      provider: 'stripe',
+      plan_interval: planInterval,
+      status: 'reserved',
+      idempotency_key: crypto.randomUUID(),
+      expires_at: new Date(Date.now() + RESERVATION_TTL_MINUTES * 60_000).toISOString(),
+    })
+    .select('id, idempotency_key')
+    .single();
+
+  if (reserveError || !reservation) {
+    // Conflito no índice único = já existe uma reserva em andamento
+    // para este usuário. Decide o que fazer com base no estado dela em
+    // vez de simplesmente rejeitar.
+    const { data: existingReservation } = await service
+      .from('checkout_reservations')
+      .select('id, status, checkout_session_id, expires_at')
+      .eq('user_id', user.id)
+      .eq('provider', 'stripe')
+      .in('status', ['reserved', 'session_created'])
+      .maybeSingle();
+
+    if (!existingReservation) {
+      // Erro real (não foi conflito de índice) — não sabemos o estado.
+      console.error('[stripe/intent] falha ao reservar checkout:', reserveError);
+      return NextResponse.json({ error: 'Erro ao iniciar pagamento. Tente novamente.' }, { status: 500 });
+    }
+
+    const isExpired = new Date(existingReservation.expires_at).getTime() < Date.now();
+    if (isExpired) {
+      // Reserva antiga nunca foi concluída — libera para uma nova
+      // tentativa marcando como expirada, sem criar sessão nesta
+      // chamada (evita duas gravações concorrentes na mesma janela;
+      // o cliente tenta de novo e cai no caminho normal).
+      await service.from('checkout_reservations').update({ status: 'expired' }).eq('id', existingReservation.id);
+      return NextResponse.json(
+        { error: 'Sua tentativa anterior expirou. Tente novamente.' },
+        { status: 409 },
+      );
+    }
+
+    if (existingReservation.checkout_session_id) {
+      // Uma requisição concorrente já criou a sessão — devolve a MESMA,
+      // não cria outra (retry idempotente do ponto de vista do usuário).
+      try {
+        const stripe = getStripe();
+        const session = await stripe.checkout.sessions.retrieve(existingReservation.checkout_session_id);
+        return NextResponse.json({ clientSecret: session.client_secret });
+      } catch (err) {
+        console.error('[stripe/intent] falha ao recuperar sessão existente:', err);
+      }
+    }
+
+    return NextResponse.json(
+      { error: 'Já existe uma tentativa de assinatura em andamento. Aguarde alguns segundos e tente novamente.' },
       { status: 409 },
     );
   }
@@ -79,26 +128,40 @@ export async function POST(req: Request) {
     const customer = existing.data[0]
       ?? await stripe.customers.create({ email, metadata: { userId: user.id } });
 
-    const price = await getOrCreatePrice(planInterval);
+    const priceId = getStripePriceId(planInterval);
 
-    const session = await stripe.checkout.sessions.create({
-      // Verificado contra o SDK instalado (stripe@22.0.2): o tipo real
-      // de ui_mode é 'elements' | 'embedded_page' | 'form' | 'hosted_page'
-      // (nomenclatura desta API version), não 'hosted'|'embedded'|'custom'
-      // como em versões/documentações mais antigas. 'embedded_page' já
-      // era o valor certo — só removido o `as any` que escondia isso do
-      // type-check sem necessidade.
-      ui_mode: 'embedded_page',
-      mode: 'subscription',
-      customer: customer.id,
-      line_items: [{ price: price.id, quantity: 1 }],
-      return_url: `${appUrl}/pricing?stripe_session={CHECKOUT_SESSION_ID}`,
-      metadata: { userId: user.id, planInterval },
-      subscription_data: { metadata: { userId: user.id, planInterval } },
-    });
+    const session = await stripe.checkout.sessions.create(
+      {
+        // Verificado contra o SDK instalado (stripe@22.0.2): o tipo real
+        // de ui_mode é 'elements' | 'embedded_page' | 'form' | 'hosted_page'
+        // (nomenclatura desta API version), não 'hosted'|'embedded'|'custom'
+        // como em versões/documentações mais antigas. 'embedded_page' já
+        // era o valor certo — só removido o `as any` que escondia isso do
+        // type-check sem necessidade.
+        ui_mode: 'embedded_page',
+        mode: 'subscription',
+        customer: customer.id,
+        line_items: [{ price: priceId, quantity: 1 }],
+        return_url: `${appUrl}/pricing?stripe_session={CHECKOUT_SESSION_ID}`,
+        metadata: { userId: user.id, planInterval },
+        subscription_data: { metadata: { userId: user.id, planInterval } },
+      },
+      // Chave de idempotência da própria Stripe: se esta exata chamada
+      // for repetida (retry de rede, por exemplo), a Stripe devolve a
+      // mesma sessão em vez de criar outra.
+      { idempotencyKey: reservation.idempotency_key },
+    );
+
+    await service
+      .from('checkout_reservations')
+      .update({ status: 'session_created', checkout_session_id: session.id })
+      .eq('id', reservation.id);
 
     return NextResponse.json({ clientSecret: session.client_secret });
   } catch (err: unknown) {
+    // Reserva não pode ficar "reserved" para sempre em caso de erro —
+    // libera pra uma nova tentativa.
+    await service.from('checkout_reservations').update({ status: 'failed' }).eq('id', reservation.id);
     const stripeErr = err as { message?: string; code?: string };
     console.error('[stripe/intent] error:', stripeErr?.message, stripeErr?.code);
     return NextResponse.json({ error: stripeErr?.message ?? 'Erro ao criar sessão de pagamento' }, { status: 500 });
