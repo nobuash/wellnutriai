@@ -4,7 +4,7 @@ import { cn } from '@/lib/utils';
 import { createClient } from '@/lib/supabase/client';
 import {
   Camera, ClipboardList, HeadphonesIcon, LayoutDashboard, LogOut,
-  MessageCircle, Smartphone, Sparkles, Utensils, X,
+  MessageCircle, Smartphone, Sparkles, User, Utensils, X,
 } from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
@@ -19,6 +19,7 @@ const nav = [
   { href: '/photo-analysis', label: 'Análise por Foto', icon: Camera, pro: true },
   { href: '/install-app', label: 'Instalar no celular', icon: Smartphone },
   { href: '/support', label: 'Suporte', icon: HeadphonesIcon },
+  { href: '/account', label: 'Minha conta', icon: User },
 ];
 
 interface SidebarProps {
