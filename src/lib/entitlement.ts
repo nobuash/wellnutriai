@@ -14,6 +14,7 @@ export interface Entitlement {
   plan: 'free' | 'pro';
   status: string;
   provider: 'stripe' | 'mercadopago' | null;
+  paymentType: string | null;
   currentPeriodEnd: string | null;
   cancelAtPeriodEnd: boolean;
   reason: EntitlementReason;
@@ -23,6 +24,7 @@ interface SubscriptionRow {
   id: string;
   status: string | null;
   provider: 'stripe' | 'mercadopago' | null;
+  payment_type: string | null;
   current_period_end: string | null;
   cancel_at_period_end: boolean | null;
   canceled_at: string | null;
@@ -33,6 +35,7 @@ const NO_SUBSCRIPTION: Entitlement = {
   plan: 'free',
   status: 'no_subscription',
   provider: null,
+  paymentType: null,
   currentPeriodEnd: null,
   cancelAtPeriodEnd: false,
   reason: 'no_subscription',
@@ -51,7 +54,7 @@ export async function getUserEntitlement(
 ): Promise<Entitlement> {
   const { data: row } = await supabase
     .from('subscriptions')
-    .select('id, status, provider, current_period_end, cancel_at_period_end, canceled_at')
+    .select('id, status, provider, payment_type, current_period_end, cancel_at_period_end, canceled_at')
     .eq('user_id', userId)
     .order('created_at', { ascending: false })
     .limit(1)
@@ -86,6 +89,7 @@ export async function getUserEntitlement(
     plan: isPro ? 'pro' : 'free',
     status: row.status ?? 'unknown',
     provider: row.provider,
+    paymentType: row.payment_type,
     currentPeriodEnd: row.current_period_end,
     cancelAtPeriodEnd: row.cancel_at_period_end ?? false,
     reason,
