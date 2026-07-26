@@ -131,4 +131,26 @@ const nextConfig = {
   },
 };
 
+// Falha o build cedo e com uma mensagem clara se uma variável de
+// ambiente sem a qual o app não roda estiver ausente — em vez de um
+// erro obscuro em runtime na primeira requisição que precisar dela.
+// (next.config.js roda puro Node/CommonJS, sem o pipeline de TS do
+// Next, por isso a checagem é duplicada aqui em JS simples em vez de
+// reusar src/lib/env.ts — que continua sendo a validação usada dentro
+// do app.)
+const REQUIRED_ENV_VARS = [
+  'NEXT_PUBLIC_SUPABASE_URL',
+  'NEXT_PUBLIC_SUPABASE_ANON_KEY',
+  'SUPABASE_SERVICE_ROLE_KEY',
+  'OPENAI_API_KEY',
+];
+
+const missingEnvVars = REQUIRED_ENV_VARS.filter((key) => !process.env[key]);
+if (missingEnvVars.length > 0) {
+  throw new Error(
+    `Variáveis de ambiente obrigatórias ausentes: ${missingEnvVars.join(', ')}. ` +
+    'Configure-as (ver .env.example) antes de rodar build/deploy.'
+  );
+}
+
 module.exports = withPWA(nextConfig);

@@ -106,6 +106,46 @@ export async function checkDailyAiBudget(): Promise<BudgetCheck> {
   }
 }
 
+interface UserBudgetCheck {
+  allowed: boolean;
+  spentThisMonthBRL: number;
+  monthlyBudgetBRL: number | null;
+}
+
+/**
+ * Teto de gasto por usuário no mês (AI_USER_MONTHLY_BUDGET_BRL) — além
+ * das cotas de contagem de uso (consumeUsageQuota), protege contra um
+ * único usuário PRO gerar custo muito acima do plano paga (ex: prompts
+ * anormalmente longos repetidos). Mesma regra do circuit breaker
+ * diário: desligado por padrão até alguém configurar um valor.
+ */
+export async function checkUserMonthlyBudget(userId: string): Promise<UserBudgetCheck> {
+  const monthlyBudget = Number(process.env.AI_USER_MONTHLY_BUDGET_BRL) || 0;
+  if (monthlyBudget <= 0) {
+    return { allowed: true, spentThisMonthBRL: 0, monthlyBudgetBRL: null };
+  }
+
+  try {
+    const service = createServiceClient();
+    const startOfMonth = new Date();
+    startOfMonth.setDate(1);
+    startOfMonth.setHours(0, 0, 0, 0);
+
+    const { data } = await service
+      .from('ai_usage_logs')
+      .select('estimated_cost_brl')
+      .eq('user_id', userId)
+      .gte('created_at', startOfMonth.toISOString());
+
+    const spent = (data ?? []).reduce((sum, row) => sum + Number(row.estimated_cost_brl ?? 0), 0);
+
+    return { allowed: spent < monthlyBudget, spentThisMonthBRL: spent, monthlyBudgetBRL: monthlyBudget };
+  } catch (err) {
+    console.error('[aiUsage] falha ao checar orçamento mensal do usuário — permitindo por padrão:', err);
+    return { allowed: true, spentThisMonthBRL: 0, monthlyBudgetBRL: monthlyBudget };
+  }
+}
+
 /**
  * Consome uma unidade de cota de uso de forma atômica via RPC
  * Postgres (consume_usage_quota) — evita a corrida de "SELECT count

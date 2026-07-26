@@ -3,7 +3,7 @@ import { formatKnowledgeContext, searchKnowledge } from '@/lib/knowledge/search'
 import { buildMealPlanPrompt, LEGAL_DISCLAIMER } from '@/lib/openai/prompts';
 import { featureLimitReason, PLAN_LIMITS } from '@/lib/plans';
 import { getUserEntitlement } from '@/lib/entitlement';
-import { checkDailyAiBudget, consumeUsageQuota, logAiUsage, monthKey } from '@/lib/aiUsage';
+import { checkDailyAiBudget, checkUserMonthlyBudget, consumeUsageQuota, logAiUsage, monthKey } from '@/lib/aiUsage';
 import {
   findForbiddenFoods,
   isHighRiskCondition,
@@ -67,6 +67,14 @@ export async function POST() {
     return NextResponse.json(
       { error: 'Estamos com alta demanda no momento. Tente novamente mais tarde.' },
       { status: 503 },
+    );
+  }
+
+  const userBudget = await checkUserMonthlyBudget(user.id);
+  if (!userBudget.allowed) {
+    return NextResponse.json(
+      { error: 'Você atingiu o limite de uso de IA do mês. Fale com o suporte se precisar de mais.' },
+      { status: 402 },
     );
   }
 

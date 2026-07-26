@@ -2,7 +2,7 @@ import { MODELS, openai } from '@/lib/openai/client';
 import { PHOTO_ANALYSIS_PROMPT } from '@/lib/openai/prompts';
 import { featureLimitReason, PLAN_LIMITS } from '@/lib/plans';
 import { getUserEntitlement } from '@/lib/entitlement';
-import { checkDailyAiBudget, consumeUsageQuota, logAiUsage, monthKey } from '@/lib/aiUsage';
+import { checkDailyAiBudget, checkUserMonthlyBudget, consumeUsageQuota, logAiUsage, monthKey } from '@/lib/aiUsage';
 import { photoAnalysisResultSchema } from '@/lib/photoAnalysisSchema';
 import { rateLimit } from '@/lib/ratelimit';
 import { createClient } from '@/lib/supabase/server';
@@ -62,6 +62,14 @@ export async function POST(req: Request) {
   const budget = await checkDailyAiBudget();
   if (!budget.allowed) {
     return NextResponse.json({ error: 'Estamos com alta demanda no momento. Tente novamente mais tarde.' }, { status: 503 });
+  }
+
+  const userBudget = await checkUserMonthlyBudget(user.id);
+  if (!userBudget.allowed) {
+    return NextResponse.json(
+      { error: 'Você atingiu o limite de uso de IA do mês. Fale com o suporte se precisar de mais.' },
+      { status: 402 },
+    );
   }
 
   const limit = PLAN_LIMITS[entitlement.plan].photoAnalysisPerMonth;
