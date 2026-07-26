@@ -4,7 +4,9 @@ import { featureLimitReason, PLAN_LIMITS } from '@/lib/plans';
 import { getUserEntitlement } from '@/lib/entitlement';
 import { checkDailyAiBudget, checkUserMonthlyBudget, consumeUsageQuota, logAiUsage, monthKey } from '@/lib/aiUsage';
 import { photoAnalysisResultSchema } from '@/lib/photoAnalysisSchema';
+import { requireCurrentConsent, consentReasonMessage } from '@/lib/consentCheck';
 import { createClient } from '@/lib/supabase/server';
+import { createServiceClient } from '@/lib/supabase/service';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 
@@ -24,14 +26,9 @@ export async function POST(req: Request) {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: 'Não autenticado' }, { status: 401 });
 
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('accepted_terms')
-    .eq('id', user.id)
-    .single();
-
-  if (!profile?.accepted_terms) {
-    return NextResponse.json({ error: 'Aceite os termos' }, { status: 403 });
+  const consent = await requireCurrentConsent(supabase, user.id);
+  if (!consent.ok) {
+    return NextResponse.json({ error: consentReasonMessage(consent.reason!) }, { status: 403 });
   }
 
   const entitlement = await getUserEntitlement(supabase, user.id);
@@ -105,8 +102,9 @@ export async function POST(req: Request) {
     }
     const result = parsedResult.data;
 
-    // Salva no histórico reutilizando a mesma tabela
-    await supabase.from('meal_photo_analysis').insert({
+    // Salva no histórico reutilizando a mesma tabela — só service_role
+    // pode escrever (ver 017_restrict_server_generated_tables.sql).
+    await createServiceClient().from('meal_photo_analysis').insert({
       user_id: user.id,
       image_url: 'manual', // sem foto
       result,

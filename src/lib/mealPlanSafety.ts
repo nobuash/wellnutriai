@@ -2,21 +2,46 @@ import type { MealPlanContent, NutritionQuestionnaire } from '@/types/database';
 import { z } from 'zod';
 
 export const MEDICAL_RESTRICTION_MESSAGE =
-  'Identificamos uma condição de saúde no seu questionário (diabetes) que exige acompanhamento ' +
-  'profissional individualizado — o ajuste de carboidratos e o risco de hipo/hiperglicemia não podem ' +
-  'ser calculados com segurança por um plano automatizado. Por isso não geramos um plano alimentar ' +
-  'personalizado para essa condição. Recomendamos fortemente uma avaliação com um(a) nutricionista ou ' +
-  'endocrinologista antes de qualquer mudança na alimentação.';
+  'Identificamos uma condição de saúde no seu questionário que exige acompanhamento profissional ' +
+  'individualizado — os riscos envolvidos não podem ser calculados com segurança por um plano ' +
+  'automatizado. Por isso não geramos um plano alimentar personalizado para essa condição. ' +
+  'Recomendamos fortemente uma avaliação com um(a) nutricionista, médico ou especialista antes de ' +
+  'qualquer mudança na alimentação.';
+
+type MedicalScreeningFields = Pick<
+  NutritionQuestionnaire,
+  | 'diabetes_type'
+  | 'is_pregnant'
+  | 'is_breastfeeding'
+  | 'has_kidney_disease'
+  | 'has_liver_disease'
+  | 'has_eating_disorder_history'
+  | 'has_severe_allergy'
+  | 'uses_insulin'
+  | 'other_medical_condition'
+>;
 
 /**
  * Condições em que a geração automatizada de plano personalizado é
- * bloqueada no MVP. Hoje o questionário só coleta diabetes_type — não
- * existem campos para gestação, amamentação, doença renal ou
- * transtorno alimentar, então esta função não pode (ainda) considerar
- * essas condições. Ver docs/production-hardening-audit.md.
+ * bloqueada no MVP: diabetes (qualquer tipo), gestação, amamentação,
+ * doença renal/hepática, histórico de transtorno alimentar, alergia
+ * severa, uso de insulina, ou qualquer condição descrita em texto
+ * livre (other_medical_condition) — texto livre é tratado como risco
+ * por padrão, já que não temos como classificá-lo automaticamente com
+ * segurança.
  */
-export function isHighRiskCondition(q: Pick<NutritionQuestionnaire, 'diabetes_type'>): boolean {
-  return q.diabetes_type !== 'none';
+export function isHighRiskCondition(q: Partial<MedicalScreeningFields>): boolean {
+  return (
+    (q.diabetes_type ?? 'none') !== 'none' ||
+    q.is_pregnant === true ||
+    q.is_breastfeeding === true ||
+    q.has_kidney_disease === true ||
+    q.has_liver_disease === true ||
+    q.has_eating_disorder_history === true ||
+    q.has_severe_allergy === true ||
+    q.uses_insulin === true ||
+    !!q.other_medical_condition?.trim()
+  );
 }
 
 function normalize(text: string): string {

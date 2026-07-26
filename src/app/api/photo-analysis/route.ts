@@ -4,8 +4,10 @@ import { featureLimitReason, PLAN_LIMITS } from '@/lib/plans';
 import { getUserEntitlement } from '@/lib/entitlement';
 import { checkDailyAiBudget, checkUserMonthlyBudget, consumeUsageQuota, logAiUsage, monthKey } from '@/lib/aiUsage';
 import { photoAnalysisResultSchema } from '@/lib/photoAnalysisSchema';
+import { requireCurrentConsent, consentReasonMessage } from '@/lib/consentCheck';
 import { rateLimit } from '@/lib/ratelimit';
 import { createClient } from '@/lib/supabase/server';
+import { createServiceClient } from '@/lib/supabase/service';
 import { NextResponse } from 'next/server';
 
 export const runtime = 'nodejs';
@@ -47,14 +49,9 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'Muitas requisições. Tente novamente em breve.' }, { status: 429 });
   }
 
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('accepted_terms')
-    .eq('id', user.id)
-    .single();
-
-  if (!profile?.accepted_terms) {
-    return NextResponse.json({ error: 'Aceite os termos' }, { status: 403 });
+  const consent = await requireCurrentConsent(supabase, user.id);
+  if (!consent.ok) {
+    return NextResponse.json({ error: consentReasonMessage(consent.reason!) }, { status: 403 });
   }
 
   const entitlement = await getUserEntitlement(supabase, user.id);
@@ -157,7 +154,9 @@ export async function POST(req: Request) {
     // Guarda o caminho no Storage, nunca uma signed URL (expira em 1h e
     // ficaria permanentemente inválida gravada no banco). Gere uma nova
     // signed URL sob demanda quando for preciso exibir a imagem.
-    const { data: saved } = await supabase
+    // meal_photo_analysis só aceita escrita via service_role (RLS) —
+    // ver 017_restrict_server_generated_tables.sql.
+    const { data: saved } = await createServiceClient()
       .from('meal_photo_analysis')
       .insert({ user_id: user.id, image_url: path, result })
       .select()

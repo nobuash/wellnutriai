@@ -3,7 +3,6 @@
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { Input } from '@/components/ui/Input';
-import { createClient } from '@/lib/supabase/client';
 import { questionnaireSchema, type QuestionnaireInput } from '@/lib/validation';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useRouter } from 'next/navigation';
@@ -29,6 +28,16 @@ const DIABETES_OPTIONS = [
   { value: 'pre_diabetes', label: 'Pré-diabetes', description: 'Glicemia levemente elevada' },
   { value: 'type2', label: 'Diabetes tipo 2', description: 'Resistência à insulina' },
   { value: 'type1', label: 'Diabetes tipo 1', description: 'Dependente de insulina' },
+] as const;
+
+const MEDICAL_CHECKBOXES = [
+  { name: 'is_pregnant', label: 'Estou grávida' },
+  { name: 'is_breastfeeding', label: 'Estou amamentando' },
+  { name: 'has_kidney_disease', label: 'Tenho doença renal' },
+  { name: 'has_liver_disease', label: 'Tenho doença hepática' },
+  { name: 'has_eating_disorder_history', label: 'Tenho ou já tive transtorno alimentar' },
+  { name: 'has_severe_allergy', label: 'Tenho alergia alimentar severa (risco de anafilaxia)' },
+  { name: 'uses_insulin', label: 'Uso insulina' },
 ] as const;
 
 function TagsInput({ value, onChange, placeholder }: {
@@ -69,7 +78,6 @@ function TagsInput({ value, onChange, placeholder }: {
 
 export default function QuestionnairePage() {
   const router = useRouter();
-  const supabase = createClient();
 
   const {
     register, handleSubmit, control, formState: { errors, isSubmitting },
@@ -77,19 +85,21 @@ export default function QuestionnairePage() {
     resolver: zodResolver(questionnaireSchema),
     defaultValues: {
       allergies: [], dietary_preferences: [], disliked_foods: [], meals_per_day: 4, diabetes_type: 'none',
+      is_pregnant: false, is_breastfeeding: false, has_kidney_disease: false, has_liver_disease: false,
+      has_eating_disorder_history: false, has_severe_allergy: false, uses_insulin: false,
     },
   });
 
   async function onSubmit(data: QuestionnaireInput) {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
+    const res = await fetch('/api/questionnaire', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+    const result = await res.json().catch(() => ({}));
 
-    const { error } = await supabase
-      .from('nutrition_questionnaires')
-      .insert({ ...data, user_id: user.id });
-
-    if (error) {
-      toast.error('Erro ao salvar questionário');
+    if (!res.ok) {
+      toast.error(result.error || 'Erro ao salvar questionário');
       return;
     }
 
@@ -161,6 +171,36 @@ export default function QuestionnairePage() {
             ))}
           </div>
           {errors.diabetes_type && <p className="text-xs text-red-600 mt-1">Selecione uma opção</p>}
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-slate-700 mb-2">
+            Alguma dessas condições se aplica a você?
+          </label>
+          <p className="text-xs text-slate-500 mb-2">
+            Isso nos ajuda a saber quando não é seguro gerar um plano automatizado — nesses casos,
+            recomendamos acompanhamento profissional em vez de uma sugestão genérica de IA.
+          </p>
+          <div className="grid md:grid-cols-2 gap-2">
+            {MEDICAL_CHECKBOXES.map((c) => (
+              <label key={c.name} className="flex items-center gap-2 rounded-lg border border-slate-200 p-3 text-sm cursor-pointer hover:bg-slate-50">
+                <input type="checkbox" {...register(c.name)} className="h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500" />
+                {c.label}
+              </label>
+            ))}
+          </div>
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-slate-700 mb-2">
+            Outra condição médica relevante (opcional)
+          </label>
+          <input
+            type="text"
+            {...register('other_medical_condition')}
+            placeholder="ex: hipotireoidismo, pós-cirurgia bariátrica..."
+            className="w-full h-10 px-3 rounded-lg border border-slate-300 text-sm focus:ring-2 focus:ring-brand-500 focus:outline-none"
+          />
         </div>
 
         <div>

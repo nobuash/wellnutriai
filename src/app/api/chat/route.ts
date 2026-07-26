@@ -5,8 +5,10 @@ import { featureLimitReason, PLAN_LIMITS } from '@/lib/plans';
 import { getUserEntitlement } from '@/lib/entitlement';
 import { checkDailyAiBudget, checkUserMonthlyBudget, consumeUsageQuota, logAiUsage, monthKey } from '@/lib/aiUsage';
 import { findForbiddenFoods, isHighRiskCondition, mealPlanContentSchema } from '@/lib/mealPlanSafety';
+import { requireCurrentConsent, consentReasonMessage } from '@/lib/consentCheck';
 import { rateLimit } from '@/lib/ratelimit';
 import { createClient } from '@/lib/supabase/server';
+import { createServiceClient } from '@/lib/supabase/service';
 import type { ChatMessage, MealPlan, MealPlanContent, NutritionQuestionnaire } from '@/types/database';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
@@ -34,14 +36,9 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'Muitas requisições. Aguarde um momento.' }, { status: 429 });
   }
 
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('accepted_terms')
-    .eq('id', user.id)
-    .single();
-
-  if (!profile?.accepted_terms) {
-    return NextResponse.json({ error: 'Aceite os termos' }, { status: 403 });
+  const consent = await requireCurrentConsent(supabase, user.id);
+  if (!consent.ok) {
+    return NextResponse.json({ error: consentReasonMessage(consent.reason!) }, { status: 403 });
   }
 
   const json = await req.json().catch(() => ({}));
@@ -102,7 +99,14 @@ export async function POST(req: Request) {
 
   const startedAt = Date.now();
 
-  await supabase.from('chat_messages').insert({
+  // chat_messages/meal_plans só aceitam escrita via service_role (RLS)
+  // — ver 017_restrict_server_generated_tables.sql. Sem isso, um
+  // usuário podia inserir direto pelo client SDK uma mensagem forjada
+  // com role: 'ai', que depois entraria como contexto em conversas
+  // futuras.
+  const service = createServiceClient();
+
+  await service.from('chat_messages').insert({
     user_id: user.id, role: 'user', message: parsed.data.message,
   });
 
@@ -154,7 +158,7 @@ export async function POST(req: Request) {
                 disclaimer: validated.data.disclaimer || mealPlanContent?.disclaimer || '',
               };
 
-              await supabase
+              await service
                 .from('meal_plans')
                 .update({ content: updatedContent, calories_estimate: updatedContent.total_calories ?? null })
                 .eq('id', mealPlan.id);
@@ -173,7 +177,7 @@ export async function POST(req: Request) {
       reply = raw;
     }
 
-    await supabase.from('chat_messages').insert({
+    await service.from('chat_messages').insert({
       user_id: user.id, role: 'ai', message: reply,
     });
 
@@ -186,7 +190,7 @@ export async function POST(req: Request) {
     });
     // A mensagem do usuário já foi salva acima — registra uma resposta
     // de erro em vez de deixar a conversa com um balão sem resposta.
-    await supabase.from('chat_messages').insert({
+    await service.from('chat_messages').insert({
       user_id: user.id, role: 'ai',
       message: 'Desculpe, tive um problema para responder agora. Tente reenviar sua mensagem em instantes.',
     });

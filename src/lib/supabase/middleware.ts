@@ -29,5 +29,13 @@ export async function updateSession(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
-  return NextResponse.next({ request });
+  // Repassa o pathname num header pra src/app/(app)/layout.tsx saber,
+  // sem prop drilling, se a rota atual precisa ficar acessível mesmo
+  // com termos desatualizados (ver TERMS_GATE_EXEMPT_PREFIXES lá —
+  // cancelar assinatura ou excluir conta nunca pode depender de aceitar
+  // novos termos primeiro).
+  const requestHeaders = new Headers(request.headers);
+  requestHeaders.set('x-pathname', pathname);
+
+  return NextResponse.next({ request: { headers: requestHeaders } });
 }
