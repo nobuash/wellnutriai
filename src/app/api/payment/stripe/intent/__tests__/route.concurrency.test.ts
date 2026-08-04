@@ -56,6 +56,7 @@ vi.mock('@/lib/stripe/client', () => ({
 
 vi.mock('@/lib/stripe/activateSubscription', () => ({
   findActiveStripeSubscription: vi.fn(async () => null),
+  findStripeCustomerId: vi.fn(async () => null),
 }));
 
 vi.mock('@/lib/distributedRateLimit', () => ({
@@ -76,6 +77,9 @@ vi.mock('@/lib/supabase/server', () => ({
 vi.mock('@/lib/supabase/service', () => ({
   createServiceClient: () => ({
     from: (table: string) => {
+      // findStripeCustomerId (que consultaria 'subscriptions') é
+      // mockado diretamente acima — só 'checkout_reservations' passa
+      // por este client mockado.
       if (table !== 'checkout_reservations') throw new Error(`tabela inesperada no teste: ${table}`);
       return {
         insert: (row: Partial<FakeReservation>) => ({

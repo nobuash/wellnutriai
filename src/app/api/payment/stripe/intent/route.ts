@@ -2,7 +2,7 @@ import { getStripe, getStripePriceId, STRIPE_INTERVALS } from '@/lib/stripe/clie
 import { type PlanInterval } from '@/lib/mercadopago/client';
 import { checkDistributedRateLimit } from '@/lib/distributedRateLimit';
 import { consentReasonMessage, requireCurrentConsent } from '@/lib/consentCheck';
-import { findActiveStripeSubscription } from '@/lib/stripe/activateSubscription';
+import { findActiveStripeSubscription, findStripeCustomerId } from '@/lib/stripe/activateSubscription';
 import { createClient } from '@/lib/supabase/server';
 import { createServiceClient } from '@/lib/supabase/service';
 import { logSupabaseWriteFailure } from '@/lib/supabaseErrors';
@@ -133,9 +133,18 @@ export async function POST(req: Request) {
   try {
     const stripe = getStripe();
 
-    const existing = await stripe.customers.list({ email, limit: 1 });
-    const customer = existing.data[0]
-      ?? await stripe.customers.create({ email, metadata: { userId: user.id } });
+    // Reusa o provider_customer_id já conhecido em vez de localizar
+    // por e-mail e pegar "o primeiro resultado" — ver
+    // findStripeCustomerId em src/lib/stripe/activateSubscription.ts.
+    const knownCustomerId = await findStripeCustomerId(user.id);
+    let customerId: string;
+    if (knownCustomerId) {
+      customerId = knownCustomerId;
+    } else {
+      const existing = await stripe.customers.list({ email, limit: 1 });
+      customerId = existing.data[0]?.id
+        ?? (await stripe.customers.create({ email, metadata: { userId: user.id } })).id;
+    }
 
     const priceId = getStripePriceId(planInterval);
 
@@ -149,7 +158,7 @@ export async function POST(req: Request) {
         // type-check sem necessidade.
         ui_mode: 'embedded_page',
         mode: 'subscription',
-        customer: customer.id,
+        customer: customerId,
         line_items: [{ price: priceId, quantity: 1 }],
         return_url: `${appUrl}/pricing?stripe_session={CHECKOUT_SESSION_ID}`,
         metadata: { userId: user.id, planInterval },

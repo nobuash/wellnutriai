@@ -5,7 +5,16 @@ let stripe: Stripe | null = null;
 
 export function getStripe() {
   if (!stripe) {
-    stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
+    // Verificado no runtime do SDK instalado (stripe@22.0.2,
+    // node_modules/stripe/cjs/stripe.core.js): `version: props.apiVersion
+    // || DEFAULT_API_VERSION` — o SDK JÁ usa sua própria versão
+    // compilada por padrão quando apiVersion não é informado, nunca o
+    // default da conta configurado no Dashboard. Não era uma falha de
+    // segurança ativa. Fixamos explicitamente mesmo assim por
+    // auditabilidade (fica visível no código, não só em node_modules) e
+    // pra não herdar silenciosamente uma versão diferente numa futura
+    // atualização do SDK sem decisão deliberada.
+    stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, { apiVersion: Stripe.API_VERSION });
   }
   return stripe;
 }
@@ -37,4 +46,18 @@ export function getStripePriceId(planInterval: PlanInterval): string {
     );
   }
   return priceId;
+}
+
+/**
+ * Allowlist de Price IDs válidos — os únicos 3 que
+ * src/app/api/payment/stripe/intent/route.ts usa pra criar checkout.
+ * Usado por activateStripeSubscription() pra recusar conceder PRO a
+ * uma assinatura Stripe com um price fora desses 3, mesmo que
+ * sub.metadata.userId bata com o usuário certo (ver round 4 —
+ * CONFIRMADO que a ativação nunca checava o price da assinatura
+ * retornada pela Stripe antes de conceder acesso).
+ */
+export function isAllowedStripePriceId(priceId: string | null | undefined): boolean {
+  if (!priceId) return false;
+  return Object.values(STRIPE_PRICE_ENV).includes(priceId);
 }
