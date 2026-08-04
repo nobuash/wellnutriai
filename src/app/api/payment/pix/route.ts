@@ -1,4 +1,5 @@
 import { getPayment, PLANS, type PlanInterval } from '@/lib/mercadopago/client';
+import { getAppUrl } from '@/lib/appUrl';
 import { checkDistributedRateLimit } from '@/lib/distributedRateLimit';
 import { consentReasonMessage, requireCurrentConsent } from '@/lib/consentCheck';
 import { createClient } from '@/lib/supabase/server';
@@ -37,7 +38,7 @@ export async function POST(req: Request) {
     .eq('id', user.id)
     .single();
 
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000';
+  const appUrl = getAppUrl();
 
   const fullName = profile?.name ?? 'Usuário';
   const nameParts = fullName.trim().split(' ');

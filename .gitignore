@@ -1,9 +1,13 @@
 node_modules/
 .next/
 out/
-.env
-.env.local
-.env*.local
+# Qualquer variante de .env é ignorada por padrão — mais seguro que
+# listar sufixos específicos (.env.local, .env*.local etc.), que
+# deixavam passar despercebido um .env.production ou .env.staging
+# sem o sufixo .local. .env.example é a única exceção explícita,
+# porque é o único que deve mesmo ser versionado.
+.env*
+!.env.example
 *.log
 .DS_Store
 dist/

@@ -155,6 +155,22 @@ export async function POST(req: Request) {
 
       if (files.length < STORAGE_PAGE_SIZE) break;
     }
+
+    // Confirma que a pasta ficou vazia de verdade em vez de só confiar
+    // na suposição "página incompleta = última página" do loop acima —
+    // uma chamada extra e barata que fecha qualquer dúvida antes de
+    // seguir para apagar o resto dos dados do usuário.
+    if (storageIssues.length === 0) {
+      const { data: remaining, error: verifyError } = await service.storage
+        .from('meal-photos')
+        .list(user.id, { limit: 1, offset: 0 });
+
+      if (verifyError) {
+        storageIssues.push(`verify: ${verifyError.message}`);
+      } else if (remaining && remaining.length > 0) {
+        storageIssues.push(`verify: pasta ainda contém ${remaining.length}+ arquivo(s) após a remoção`);
+      }
+    }
   } catch (err) {
     storageIssues.push(String((err as Error)?.message ?? err));
   }

@@ -50,6 +50,10 @@ export async function POST(req: Request) {
     if (result.outcome === 'inactive') {
       return NextResponse.json({ status: result.status, activated: false });
     }
+    if (result.outcome === 'price_not_allowed') {
+      console.error(`[stripe/activate] price não permitido para sub=${subscriptionId} user=${user.id}`);
+      return NextResponse.json({ error: 'Não foi possível confirmar o plano desta assinatura. Contate o suporte.' }, { status: 502 });
+    }
 
     console.log(`[stripe/activate] user=${user.id} ativado PRO sub=${subscriptionId} expira=${result.periodEnd}`);
     return NextResponse.json({ status: 'complete', activated: true, periodEnd: result.periodEnd });

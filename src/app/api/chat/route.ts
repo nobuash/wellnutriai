@@ -10,6 +10,7 @@ import { checkDistributedRateLimit } from '@/lib/distributedRateLimit';
 import { rateLimit } from '@/lib/ratelimit';
 import { createClient } from '@/lib/supabase/server';
 import { createServiceClient } from '@/lib/supabase/service';
+import { logSupabaseWriteFailure } from '@/lib/supabaseErrors';
 import type { ChatMessage, MealPlan, MealPlanContent, NutritionQuestionnaire } from '@/types/database';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
@@ -110,9 +111,17 @@ export async function POST(req: Request) {
   // futuras.
   const service = createServiceClient();
 
-  await service.from('chat_messages').insert({
+  // Obrigatória: nada mais aconteceu ainda (nenhum custo de IA
+  // incorrido) — melhor falhar cedo se não conseguimos nem persistir
+  // a mensagem do usuário do que gastar dinheiro numa conversa que
+  // não vai ficar registrada.
+  const { error: userMsgError } = await service.from('chat_messages').insert({
     user_id: user.id, role: 'user', message: parsed.data.message,
   });
+  if (userMsgError) {
+    console.error('[chat] falha ao salvar mensagem do usuário:', userMsgError);
+    return NextResponse.json({ error: 'Não foi possível registrar sua mensagem. Tente novamente.' }, { status: 500 });
+  }
 
   try {
     const completion = await openai.chat.completions.create({
@@ -162,12 +171,21 @@ export async function POST(req: Request) {
                 disclaimer: validated.data.disclaimer || mealPlanContent?.disclaimer || '',
               };
 
-              await service
+              const { error: updateError } = await service
                 .from('meal_plans')
                 .update({ content: updatedContent, calories_estimate: updatedContent.total_calories ?? null })
                 .eq('id', mealPlan.id);
 
-              mealPlanUpdated = true;
+              if (updateError) {
+                // Obrigatória em espírito: não podemos dizer
+                // "mealPlanUpdated: true" pro cliente se a escrita não
+                // foi confirmada — isso faria a UI achar que salvou
+                // quando na verdade não salvou nada.
+                console.error('[chat] falha ao gravar meal_plan_update:', updateError);
+                reply += '\n\n_Não consegui salvar essa alteração no seu plano agora. Tente novamente em instantes._';
+              } else {
+                mealPlanUpdated = true;
+              }
             } else {
               console.warn('[chat] meal_plan_update rejeitado por alergia:', forbidden);
               reply += `\n\n_Não apliquei essa mudança porque o resultado incluiria ${forbidden.join(', ')}, que está na sua lista de alergias/restrições._`;
@@ -181,9 +199,14 @@ export async function POST(req: Request) {
       reply = raw;
     }
 
-    await service.from('chat_messages').insert({
+    // Não bloqueante: a resposta já foi gerada e o custo de IA já foi
+    // incorrido — negar a resposta ao usuário por causa de uma falha
+    // em salvar o histórico seria pior sem nenhum ganho. A falha ainda
+    // vira um alerta observável (ver logSupabaseWriteFailure).
+    const { error: aiMsgError } = await service.from('chat_messages').insert({
       user_id: user.id, role: 'ai', message: reply,
     });
+    logSupabaseWriteFailure('chat', aiMsgError);
 
     return NextResponse.json({ reply, mealPlanUpdated });
   } catch (err) {
@@ -194,10 +217,13 @@ export async function POST(req: Request) {
     });
     // A mensagem do usuário já foi salva acima — registra uma resposta
     // de erro em vez de deixar a conversa com um balão sem resposta.
-    await service.from('chat_messages').insert({
+    // Best-effort: já estamos no caminho de erro, uma segunda falha
+    // aqui não deve impedir a resposta de erro de chegar ao cliente.
+    const { error: fallbackMsgError } = await service.from('chat_messages').insert({
       user_id: user.id, role: 'ai',
       message: 'Desculpe, tive um problema para responder agora. Tente reenviar sua mensagem em instantes.',
     });
+    logSupabaseWriteFailure('chat', fallbackMsgError);
     return NextResponse.json({ error: 'Falha no chat' }, { status: 500 });
   }
 }

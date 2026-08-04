@@ -9,6 +9,7 @@ import { checkDistributedRateLimit } from '@/lib/distributedRateLimit';
 import { rateLimit } from '@/lib/ratelimit';
 import { createClient } from '@/lib/supabase/server';
 import { createServiceClient } from '@/lib/supabase/service';
+import { logSupabaseWriteFailure } from '@/lib/supabaseErrors';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 
@@ -115,11 +116,14 @@ export async function POST(req: Request) {
 
     // Salva no histórico reutilizando a mesma tabela — só service_role
     // pode escrever (ver 017_restrict_server_generated_tables.sql).
-    await createServiceClient().from('meal_photo_analysis').insert({
+    // Não bloqueante: a resposta (`{ result }`) não depende deste
+    // registro — mesmo raciocínio de src/app/api/photo-analysis/route.ts.
+    const { error: saveError } = await createServiceClient().from('meal_photo_analysis').insert({
       user_id: user.id,
       image_url: 'manual', // sem foto
       result,
     });
+    logSupabaseWriteFailure('photo-analysis-manual', saveError);
 
     return NextResponse.json({ result });
   } catch (err) {

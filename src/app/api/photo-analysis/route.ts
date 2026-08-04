@@ -9,6 +9,7 @@ import { checkDistributedRateLimit } from '@/lib/distributedRateLimit';
 import { rateLimit } from '@/lib/ratelimit';
 import { createClient } from '@/lib/supabase/server';
 import { createServiceClient } from '@/lib/supabase/service';
+import { logSupabaseWriteFailure } from '@/lib/supabaseErrors';
 import { NextResponse } from 'next/server';
 
 export const runtime = 'nodejs';
@@ -160,13 +161,23 @@ export async function POST(req: Request) {
     // signed URL sob demanda quando for preciso exibir a imagem.
     // meal_photo_analysis só aceita escrita via service_role (RLS) —
     // ver 017_restrict_server_generated_tables.sql.
-    const { data: saved } = await createServiceClient()
+    //
+    // Não bloqueante: o frontend (photo-analysis/page.tsx) só usa
+    // `result` da resposta — `analysis` não é lido por ninguém, o
+    // histórico é buscado depois via query separada. A foto já foi
+    // analisada e custou uma chamada de IA de verdade; negar o
+    // resultado ao usuário por causa de uma falha em salvar o
+    // histórico seria pior sem nenhum ganho. A falha ainda vira um
+    // alerta observável.
+    const { data: saved, error: saveError } = await createServiceClient()
       .from('meal_photo_analysis')
       .insert({ user_id: user.id, image_url: path, result })
       .select()
       .single();
 
-    return NextResponse.json({ analysis: saved, result });
+    logSupabaseWriteFailure('photo', saveError);
+
+    return NextResponse.json({ analysis: saved ?? null, result });
   } catch (err) {
     console.error('[photo] error:', (err as Error).message);
     return NextResponse.json({ error: 'Falha na análise' }, { status: 500 });

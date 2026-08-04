@@ -1,0 +1,25 @@
+version: 2
+updates:
+  # Dependências npm — PRs semanais, agrupados por tipo pra não
+  # inundar o repositório com dezenas de PRs individuais.
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 10
+    groups:
+      production-dependencies:
+        dependency-type: "production"
+        update-types: ["minor", "patch"]
+      development-dependencies:
+        dependency-type: "development"
+        update-types: ["minor", "patch"]
+    # Major version bumps ficam FORA dos grupos acima (cada um vira um
+    # PR individual) — merges de major exigem revisão manual, nunca
+    # devem ser agrupados/mergeados sem olhar o changelog.
+
+  # GitHub Actions usadas no CI.
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
