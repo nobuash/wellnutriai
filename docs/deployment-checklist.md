@@ -1,9 +1,10 @@
-# Checklist de deploy — hardening de produção (rounds 1, 2 e 3)
+# Checklist de deploy — hardening de produção (rounds 1, 2, 3 e 4)
 
 Este checklist é para o merge de `fix/production-hardening` (round 1),
-`fix/production-hardening-round-2` e `fix/production-hardening-round-3`
-em produção. Siga na ordem — as migrations do Supabase precisam rodar
-**antes** do deploy do código que depende delas.
+`fix/production-hardening-round-2`, `fix/production-hardening-round-3`
+e `fix/production-hardening-round-4` em produção. Siga na ordem — as
+migrations do Supabase precisam rodar **antes** do deploy do código
+que depende delas.
 
 **⚠️ Round 3 introduz o MESMO padrão de risco que já causou um
 incidente real no round 2**: `sum_ai_cost_brl` (migration 024) é
@@ -102,6 +103,16 @@ divergente) e seguras para rodar contra o banco existente:
   com falha fechada — rode esta migration antes do deploy do código,
   sempre.
 
+**Round 4:**
+- `025_checkout_reservation_cleanup.sql` — nova RPC
+  `cleanup_expired_checkout_reservations`, sem risco pra dado
+  existente. **Não se autoagenda** — só faz sentido se algo chamar
+  periodicamente (ver seção "Configuração externa pendente" abaixo). A
+  limpeza preguiçosa já embutida no código (reserva expirada é
+  liberada inline quando alguém esbarra nela) já evita bloqueio
+  funcional mesmo sem agendar isso — é higiene de tabela, não uma
+  correção de segurança.
+
 ## 2. Variáveis de ambiente (Vercel)
 
 Confirme que todas as variáveis em `.env.example` estão configuradas no
@@ -136,8 +147,10 @@ credenciais continuam os mesmos.
 
 ## 5. Deploy do código
 
-- Merge `fix/production-hardening`, `fix/production-hardening-round-2` e
-  `fix/production-hardening-round-3` → `main`, nessa ordem.
+- Merge `fix/production-hardening`, `fix/production-hardening-round-2`,
+  `fix/production-hardening-round-3` e `fix/production-hardening-round-4`
+  → `main`, nessa ordem (o round 4 foi construído em cima do round 3,
+  então o merge do round 3 precisa acontecer primeiro).
 - Deploy automático (Vercel) ou manual, como já configurado no projeto.
 
 ## 6. Verificação pós-deploy (smoke test manual)
@@ -188,6 +201,23 @@ credenciais continuam os mesmos.
       assinatura existente → continua funcionando.
 - [ ] Derrubar `AI_DAILY_BUDGET_BRL` pra um valor bem baixo temporariamente e gerar uso de IA → é bloqueado
       corretamente (não silenciosamente permitido).
+
+**Round 4 (nenhum destes foi exercitado por mim contra Stripe/MP reais — ver `docs/production-hardening-round-4.md`):**
+- [ ] **Crítico**: enviar um webhook de teste real do Mercado Pago (painel do MP tem um simulador de
+      notificações) → confirmar que a assinatura é aceita e o pagamento é ativado. Se o webhook real do
+      MP rejeitar com 401, o problema é quase certamente a suposição de `ts` em milissegundos — ver o
+      aviso não resolvido em `src/lib/mercadopago/webhook.ts` e no relatório do round 4.
+- [ ] Pagar via cartão avulso do MP (`/api/payment/card`) → confirmar que ativa exatamente como PIX/webhook
+      (agora usa `activateMpPayment`, não mais uma lógica própria de expiração).
+- [ ] Assinar via Stripe, sair, entrar de novo e assinar de novo com a assinatura anterior ainda ativa (ou
+      simular concorrência com duas abas) → nenhuma segunda `checkout_reservations` fica "reserved" presa;
+      `subscriptions.provider_customer_id` é reaproveitado entre tentativas do mesmo usuário.
+- [ ] Excluir conta de teste com mais de 1000 fotos → confirmar (via log ou Storage Dashboard) que a
+      verificação final de pasta vazia não acusa nenhum arquivo restante.
+- [ ] Conferir no Vercel/logs que nenhuma mensagem de erro da Stripe aparece na resposta HTTP de
+      `/api/payment/stripe/intent` quando algo falha — só uma mensagem genérica + `requestId`.
+- [ ] Em produção, confirmar que `NEXT_PUBLIC_APP_URL` está com `https://` — se estiver ausente ou com
+      `http://`, o app vai falhar ao iniciar (erro claro), não silenciosamente usar localhost.
 
 ## Rollback
 
