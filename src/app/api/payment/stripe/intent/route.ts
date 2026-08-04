@@ -1,11 +1,13 @@
 import { getStripe, getStripePriceId, STRIPE_INTERVALS } from '@/lib/stripe/client';
 import { type PlanInterval } from '@/lib/mercadopago/client';
+import { getAppUrl } from '@/lib/appUrl';
 import { checkDistributedRateLimit } from '@/lib/distributedRateLimit';
 import { consentReasonMessage, requireCurrentConsent } from '@/lib/consentCheck';
 import { findActiveStripeSubscription, findStripeCustomerId } from '@/lib/stripe/activateSubscription';
 import { createClient } from '@/lib/supabase/server';
 import { createServiceClient } from '@/lib/supabase/service';
 import { logSupabaseWriteFailure } from '@/lib/supabaseErrors';
+import { generateRequestId } from '@/lib/requestId';
 import { NextResponse } from 'next/server';
 
 export const runtime = 'nodejs';
@@ -128,7 +130,7 @@ export async function POST(req: Request) {
   }
 
   const email = user.email ?? `${user.id}@wellnutriai.app`;
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://wellnutriai.com';
+  const appUrl = getAppUrl();
 
   try {
     const stripe = getStripe();
@@ -204,7 +206,16 @@ export async function POST(req: Request) {
     const { error: failError } = await service.from('checkout_reservations').update({ status: 'failed' }).eq('id', reservation.id);
     logSupabaseWriteFailure('stripe-intent', failError);
     const stripeErr = err as { message?: string; code?: string };
-    console.error('[stripe/intent] error:', stripeErr?.message, stripeErr?.code);
-    return NextResponse.json({ error: stripeErr?.message ?? 'Erro ao criar sessão de pagamento' }, { status: 500 });
+    // CONFIRMADO: mensagem interna da Stripe (stripeErr.message) era
+    // devolvida direto pro frontend — pode conter detalhes internos da
+    // integração (nomes de parâmetros, IDs de recursos). Loga o erro
+    // real com um requestId; devolve só uma mensagem genérica + o id
+    // pra suporte conseguir localizar o log.
+    const requestId = generateRequestId();
+    console.error(`[stripe/intent] error requestId=${requestId}:`, stripeErr?.message, stripeErr?.code);
+    return NextResponse.json(
+      { error: 'Erro ao criar sessão de pagamento. Tente novamente ou contate o suporte com o código: ' + requestId, requestId },
+      { status: 500 },
+    );
   }
 }

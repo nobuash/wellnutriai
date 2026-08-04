@@ -1,5 +1,6 @@
 import { getPayment, PLANS, type PlanInterval } from '@/lib/mercadopago/client';
 import { activateMpPayment } from '@/lib/mercadopago/activatePayment';
+import { getAppUrl } from '@/lib/appUrl';
 import { checkDistributedRateLimit } from '@/lib/distributedRateLimit';
 import { consentReasonMessage, requireCurrentConsent } from '@/lib/consentCheck';
 import { createClient } from '@/lib/supabase/server';
@@ -45,7 +46,7 @@ export async function POST(req: Request) {
 
   const { token, installments, payment_method_id, issuer_id, payer, planInterval } = parsed.data;
   const plan = PLANS[planInterval as PlanInterval];
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000';
+  const appUrl = getAppUrl();
 
   const { data: profile } = await supabase
     .from('profiles')
