@@ -17,10 +17,17 @@ export async function POST(req: NextRequest) {
   let body: Record<string, unknown> = {};
   try { body = JSON.parse(rawBody); } catch { body = {}; }
 
+  // Prioriza os QUERY PARAMS da URL — é o valor que o Mercado Pago
+  // efetivamente assina (ver src/lib/mercadopago/webhook.ts). Usar o
+  // data.id do corpo como fonte principal permitiria, em tese, um
+  // corpo forjado com um data.id diferente do que foi assinado
+  // (confused deputy) — o corpo só é usado como último fallback, nunca
+  // como fonte primária, e o MESMO valor resultante é usado tanto para
+  // verificar a assinatura quanto para buscar/ativar o pagamento.
   const dataId =
-    (body?.data as Record<string, string> | undefined)?.id ??
     req.nextUrl.searchParams.get('data.id') ??
     req.nextUrl.searchParams.get('id') ??
+    (body?.data as Record<string, string> | undefined)?.id ??
     '';
 
   const type =
