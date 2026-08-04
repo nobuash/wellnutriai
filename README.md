@@ -54,14 +54,17 @@ src/
 ├── types/database.ts
 ├── middleware.ts
 supabase/
-└── migrations/            # 001 → 012, todas idempotentes
+└── migrations/            # 001 → 025, todas idempotentes
 docs/
-├── production-hardening-audit.md   # achados confirmados + status de cada correção
+├── production-hardening-audit.md      # round 1 — achados confirmados + status
+├── production-hardening-round-2.md    # round 2 — idem
+├── production-hardening-round-3.md    # round 3 — idem
+├── production-hardening-round-4.md    # round 4 — idem
 ├── payment-flows.md
 ├── security.md
 ├── data-retention.md
 ├── ai-cost-control.md
-├── deployment-checklist.md
+├── deployment-checklist.md            # ordem de deploy + migrations + smoke tests
 └── incident-response.md
 ```
 
@@ -161,12 +164,21 @@ limite.
 
 ---
 
-## 🧰 CI
+## 🧰 CI e testes
 
-`.github/workflows/ci.yml` roda `type-check`, `lint` e `build` em todo PR
-e push para `main`, com env vars fictícias só para o build passar. Não há
-suite de testes automatizados ainda (ver `docs/production-hardening-audit.md`
-para o que falta).
+`.github/workflows/ci.yml` roda `type-check`, `lint`, `test` e `build` em
+todo PR e push para `main`, com env vars fictícias só para o build passar.
+
+Testes automatizados (`npm run test`, Vitest) cobrem funções puras de alto
+risco financeiro/segurança (seleção de entitlement, avaliação de
+pagamento do Mercado Pago, verificação de assinatura de webhook,
+consentimento, validação médica/alergia) e alguns Route Handlers com
+I/O mockado (webhooks, checkout, exclusão de conta), incluindo testes de
+concorrência simulada para claim de webhook e reserva de checkout. Nunca
+fazem I/O real (Supabase/Stripe/Mercado Pago/OpenAI são sempre mockados
+— ver `vitest.config.ts`). Não há testes de integração contra um banco
+real nem E2E (Playwright) ainda — ver `docs/production-hardening-round-4.md`
+para o que falta e por quê.
 
 ---
 
