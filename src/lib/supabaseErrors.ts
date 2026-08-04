@@ -42,3 +42,25 @@ export class SupabaseOperationError extends Error {
     this.details = details;
   }
 }
+
+/**
+ * Para escritas "importantes mas não bloqueantes": a resposta ao
+ * usuário já está pronta e não depende do resultado desta gravação
+ * (ex: salvar a resposta do chat no histórico DEPOIS que a IA já
+ * gerou a resposta e o custo já foi incorrido — bloquear a resposta
+ * por uma falha de persistência de histórico seria pior para o
+ * usuário sem nenhum ganho, já que o dinheiro da chamada de IA já foi
+ * gasto de qualquer jeito). Nunca lança — só garante que a falha vira
+ * um alerta observável nos logs em vez de desaparecer silenciosamente.
+ *
+ * Diferente de uma escrita best-effort de telemetria pura (ex: audit
+ * log de "conta excluída"): aqui a falha É um problema real que
+ * alguém precisa investigar, só não é motivo para negar a resposta.
+ */
+export function logSupabaseWriteFailure(
+  context: string,
+  error: { message: string; code?: string } | null,
+): void {
+  if (!error) return;
+  console.error(`[${context}] ALERTA: escrita falhou (não bloqueia a resposta, mas precisa de investigação):`, error.message, error.code ? `code=${error.code}` : '');
+}
