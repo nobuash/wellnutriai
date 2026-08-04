@@ -1,7 +1,8 @@
 import { AppShell } from '@/components/AppShell';
 import { Disclaimer } from '@/components/ui/Disclaimer';
 import { MobileInstallPrompt } from '@/components/MobileInstallPrompt';
-import { TERMS_VERSION } from '@/lib/consent';
+import { PRIVACY_VERSION, TERMS_VERSION } from '@/lib/consent';
+import { evaluateConsent } from '@/lib/consentCheck';
 import { createClient } from '@/lib/supabase/server';
 import { headers } from 'next/headers';
 import { redirect } from 'next/navigation';
@@ -28,16 +29,21 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
   const { data: profile } = await supabase
     .from('profiles')
-    .select('name, plan, accepted_terms, terms_version')
+    .select('name, plan, accepted_terms, terms_version, privacy_version')
     .eq('id', user.id)
     .single();
 
   // O gate de aceite precisa ler o banco, não user_metadata do JWT: o
   // usuário pode escrever em user_metadata livremente via
   // supabase.auth.updateUser(), então isso nunca pode ser a fonte da
-  // verdade de um controle de acesso. Também exige nova versão dos
-  // termos quando TERMS_VERSION sobe.
-  if (!isExemptFromTermsGate && (!profile?.accepted_terms || profile.terms_version !== TERMS_VERSION)) {
+  // verdade de um controle de acesso. Usa a mesma evaluateConsent() das
+  // rotas de API (src/lib/consentCheck.ts) em vez de replicar a regra
+  // aqui — antes este gate só checava terms_version, então quando só a
+  // Política de Privacidade mudava (privacy_version), o usuário nunca
+  // era levado a reaceitar pela UI, mesmo as APIs já bloqueando com
+  // "outdated_privacy".
+  const consent = evaluateConsent(profile ?? null, TERMS_VERSION, PRIVACY_VERSION);
+  if (!isExemptFromTermsGate && !consent.ok) {
     redirect('/accept-terms');
   }
 

@@ -1,4 +1,5 @@
 import type { createServiceClient } from '@/lib/supabase/service';
+import { requireSupabaseSuccess } from '@/lib/supabaseErrors';
 
 /**
  * profiles.plan é só cache visual (a fonte da verdade é
@@ -24,5 +25,7 @@ export async function recalculateVisualPlanCache(
     return new Date(r.current_period_end).getTime() >= Date.now();
   });
 
-  await service.from('profiles').update({ plan: hasActive ? 'pro' : 'free' }).eq('id', userId);
+  await requireSupabaseSuccess(
+    service.from('profiles').update({ plan: hasActive ? 'pro' : 'free' }).eq('id', userId),
+  );
 }

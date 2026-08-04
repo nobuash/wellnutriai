@@ -41,6 +41,17 @@ export async function POST(req: Request) {
         return NextResponse.json({ error: 'Valor do pagamento não confere com o plano' }, { status: 400 });
       case 'revoked':
         return NextResponse.json({ status: 'revoked', activated: false, message: 'Pagamento não está mais aprovado' });
+      case 'missing_approval_date':
+        // approved mas sem data confiável — não ativamos às cegas (ver
+        // evaluateMpPayment). O suporte precisa revisar manualmente; do
+        // lado do usuário, isso parece "ainda processando" para não
+        // expor detalhe interno nem sugerir que algo deu errado com o
+        // pagamento em si.
+        return NextResponse.json({
+          status: 'pending_review',
+          activated: false,
+          message: 'Seu pagamento está em análise. Se não for confirmado em alguns minutos, contate o suporte.',
+        });
     }
   } catch (err) {
     console.error('[verify] error:', err);

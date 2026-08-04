@@ -61,9 +61,20 @@ const NON_ACTIVE_PRIORITY: Record<string, number> = {
   expired: 5,
 };
 
+/**
+ * Uma linha 'active' sem current_period_end NUNCA concede PRO
+ * indefinidamente (bug confirmado no round 3 — antes retornava `true`
+ * aqui, dando acesso vitalício a qualquer linha incompleta).
+ * Pagamento avulso (pix/one_time_card) sem data de expiração é sempre
+ * inválido — não existe cenário legítimo onde isso deveria acontecer,
+ * já que evaluateMpPayment sempre calcula expiresAt antes de gravar.
+ * Assinatura recorrente (subscription) sem período é tratada como
+ * inválida também: melhor pedir para o self-heal resincronizar com o
+ * provedor do que confiar cegamente numa linha incompleta.
+ */
 function isValidActive(row: SubscriptionRow, nowMs: number): boolean {
   if (row.status !== 'active') return false;
-  if (!row.current_period_end) return true;
+  if (!row.current_period_end) return false;
   return new Date(row.current_period_end).getTime() >= nowMs;
 }
 

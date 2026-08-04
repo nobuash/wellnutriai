@@ -1,9 +1,17 @@
-# Checklist de deploy — hardening de produção (rounds 1 e 2)
+# Checklist de deploy — hardening de produção (rounds 1, 2 e 3)
 
-Este checklist é para o merge de `fix/production-hardening` (round 1) e
-`fix/production-hardening-round-2` em produção. Siga na ordem — as
-migrations do Supabase precisam rodar **antes** do deploy do código que
-depende delas.
+Este checklist é para o merge de `fix/production-hardening` (round 1),
+`fix/production-hardening-round-2` e `fix/production-hardening-round-3`
+em produção. Siga na ordem — as migrations do Supabase precisam rodar
+**antes** do deploy do código que depende delas.
+
+**⚠️ Round 3 introduz o MESMO padrão de risco que já causou um
+incidente real no round 2**: `sum_ai_cost_brl` (migration 024) é
+chamada pelo código novo com falha FECHADA — se a migration não tiver
+rodado quando o código for deployado, **toda feature de IA (chat,
+plano alimentar, análise de foto) fica bloqueada** para todo usuário
+até a migration alcançar produção. Migrations sempre antes do código,
+sem exceção.
 
 ## 1. Banco de dados (Supabase SQL Editor, em ordem)
 
@@ -77,12 +85,34 @@ divergente) e seguras para rodar contra o banco existente:
   quebra questionários existentes.
 - `020_account_deletion_requests.sql`
 
+**Round 3:**
+- `021_fix_subscription_payment_types.sql` — corrige `payment_type` de
+  assinaturas Stripe já gravadas como `'card'` para `'subscription'`
+  (identifica pelo prefixo `sub_` do `provider_subscription_id`, nunca
+  às cegas) e renomeia `'card'` do Mercado Pago para `'one_time_card'`.
+  Roda um `NOTICE` de relatório antes de tocar em qualquer dado — revise
+  o log da migration no Supabase antes de confirmar se aparecer aviso
+  de linha ambígua.
+- `022_atomic_webhook_claim.sql` — nova RPC `claim_webhook_event`, só
+  `service_role` pode chamar. Não quebra nada em produção sozinha, mas
+  o código novo depende dela para reprocessar webhooks travados.
+- `023_checkout_reservations.sql` — nova tabela, sem risco.
+- `024_ai_cost_sum_rpc.sql` — nova RPC `sum_ai_cost_brl`. **Ver aviso
+  crítico no topo deste documento**: o código novo já chama esta RPC
+  com falha fechada — rode esta migration antes do deploy do código,
+  sempre.
+
 ## 2. Variáveis de ambiente (Vercel)
 
 Confirme que todas as variáveis em `.env.example` estão configuradas no
 projeto Vercel (Production **e** Preview, se usar preview deployments com
-dados reais). Novas nesta rodada: `TERMS_VERSION`, `PRIVACY_VERSION`,
+dados reais). Novas no round 2: `TERMS_VERSION`, `PRIVACY_VERSION`,
 `AI_DAILY_BUDGET_BRL`, `AI_USER_MONTHLY_BUDGET_BRL`, `USD_BRL_RATE`.
+Novas no round 3: `STRIPE_PRICE_MONTHLY`, `STRIPE_PRICE_QUARTERLY`,
+`STRIPE_PRICE_ANNUAL` — precisam ser criadas como Price reais no Stripe
+Dashboard (Products → WellNutriAI PRO) antes do deploy, ou **toda
+tentativa de assinatura via Stripe falha** (o checkout não cria mais
+Product/Price dinamicamente).
 
 O build falha imediatamente se `NEXT_PUBLIC_SUPABASE_URL`,
 `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY` ou
@@ -106,7 +136,8 @@ credenciais continuam os mesmos.
 
 ## 5. Deploy do código
 
-- Merge `fix/production-hardening` e `fix/production-hardening-round-2` → `main`, nessa ordem.
+- Merge `fix/production-hardening`, `fix/production-hardening-round-2` e
+  `fix/production-hardening-round-3` → `main`, nessa ordem.
 - Deploy automático (Vercel) ou manual, como já configurado no projeto.
 
 ## 6. Verificação pós-deploy (smoke test manual)
@@ -140,6 +171,24 @@ credenciais continuam os mesmos.
       somem do bucket `meal-photos`; repetir com uma assinatura Stripe ativa e confirmar que, se o
       cancelamento falhar (ex: chave de teste inválida), a conta **não** é apagada.
 
+**Round 3 (nenhum destes foi exercitado por mim contra Stripe/MP reais — ver `docs/production-hardening-round-3.md`):**
+- [ ] Assinar via Stripe (sandbox) → `select payment_type from subscriptions where provider='stripe'`
+      mostra `'subscription'`, não `'card'`.
+- [ ] Cancelar essa assinatura pela UI → funciona (antes deste round, não encontrava a assinatura).
+- [ ] `/dashboard` mostra o badge de "renovação automática" para essa assinatura (antes, nunca aparecia
+      para Stripe).
+- [ ] Abrir o modal de assinatura Stripe em duas abas e clicar em assinar nas duas quase ao mesmo tempo
+      → só uma Checkout Session é criada de verdade (a segunda aba recebe a mesma ou um erro de
+      "tentativa em andamento", nunca uma segunda sessão nova).
+- [ ] Excluir conta de teste com mais de 1000 fotos no bucket `meal-photos` → todas são removidas, não só
+      as primeiras 1000.
+- [ ] Gerar plano alimentar/chat com termos aceitos mas `PRIVACY_VERSION` diferente (simular temporariamente)
+      → redireciona para `/accept-terms`.
+- [ ] Usuário com termos desatualizados tenta comprar (Stripe/PIX/cartão) → bloqueado; tenta cancelar
+      assinatura existente → continua funcionando.
+- [ ] Derrubar `AI_DAILY_BUDGET_BRL` pra um valor bem baixo temporariamente e gerar uso de IA → é bloqueado
+      corretamente (não silenciosamente permitido).
+
 ## Rollback
 
 - **Código**: reverter o merge / redeploy do commit anterior no Vercel —
@@ -160,8 +209,15 @@ credenciais continuam os mesmos.
   código.)
 - O mesmo raciocínio vale para `017_restrict_server_generated_tables.sql`
   (RLS de `meal_plans`/`chat_messages`/`meal_photo_analysis`/
-  `nutrition_questionnaires`) e `013_lock_down_security_definer_rpcs.sql`
-  (RPCs de cota/rate limit) — reverter o código para uma versão anterior
-  a estas migrations sem também reverter a migration correspondente
-  quebra a escrita nessas tabelas/funções. Prefira sempre reverter só o
-  código e manter as migrations aplicadas.
+  `nutrition_questionnaires`), `013_lock_down_security_definer_rpcs.sql`
+  (RPCs de cota/rate limit) e `024_ai_cost_sum_rpc.sql` (soma de custo
+  de IA, chamada com falha fechada) — reverter o código para uma versão
+  anterior a estas migrations sem também reverter a migration
+  correspondente quebra a escrita/leitura nessas tabelas/funções (e no
+  caso da 024, bloqueia toda feature de IA). Prefira sempre reverter só
+  o código e manter as migrations aplicadas.
+- `021_fix_subscription_payment_types.sql` só faz UPDATE de dados
+  existentes com base em um sinal confiável (prefixo `sub_` do ID da
+  Stripe) — não precisa ser revertida junto com um rollback de código,
+  os dados corrigidos continuam corretos independente da versão do
+  código no ar.

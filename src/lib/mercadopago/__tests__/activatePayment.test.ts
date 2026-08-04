@@ -83,10 +83,25 @@ describe('evaluateMpPayment — determinismo de replay', () => {
     if (result.kind === 'revoke') expect(result.newStatus).toBe('expired');
   });
 
-  it('identifica corretamente pagamento via PIX vs cartão', () => {
+  it('identifica corretamente pagamento via PIX vs cartão avulso', () => {
     const pix = evaluateMpPayment(approvedPayment({ payment_method_id: 'pix' }));
     const card = evaluateMpPayment(approvedPayment({ payment_method_id: 'master' }));
     expect(pix.kind === 'activate' && pix.paymentType).toBe('pix');
-    expect(card.kind === 'activate' && card.paymentType).toBe('card');
+    // 'one_time_card', não 'card' — não pode ser confundido com
+    // payment_type='subscription' (assinatura recorrente real, seja
+    // Stripe ou preapproval do MP). Ver src/lib/subscriptionTypes.ts.
+    expect(card.kind === 'activate' && card.paymentType).toBe('one_time_card');
+  });
+
+  it('approved sem date_approved NÃO usa a hora atual — vai para revisão manual', () => {
+    const payment = approvedPayment({ date_approved: null });
+    const result = evaluateMpPayment(payment);
+    expect(result.kind).toBe('missing_approval_date');
+  });
+
+  it('approved sem date_approved nunca ativa, mesmo chamado repetidamente em momentos diferentes', () => {
+    const payment = approvedPayment({ date_approved: undefined });
+    const results = Array.from({ length: 5 }, () => evaluateMpPayment(payment));
+    expect(results.every((r) => r.kind === 'missing_approval_date')).toBe(true);
   });
 });

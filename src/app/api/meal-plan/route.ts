@@ -89,7 +89,7 @@ export async function POST() {
   }
 
   const knowledgeQuery = `nutrição ${questionnaire.goal} ${questionnaire.activity_level} plano alimentar macronutrientes`;
-  const knowledgeChunks = await searchKnowledge(knowledgeQuery, 5);
+  const knowledgeChunks = await searchKnowledge(knowledgeQuery, 5, 0.55, user.id);
   const knowledgeContext = formatKnowledgeContext(knowledgeChunks);
 
   const startedAt = Date.now();
@@ -97,7 +97,7 @@ export async function POST() {
   try {
     const { content, inputTokens, outputTokens } = await generateValidatedMealPlan(questionnaire, knowledgeContext);
 
-    void logAiUsage({
+    await logAiUsage({
       userId: user.id,
       feature: 'meal_plan',
       model: MODELS.TEXT,
@@ -132,7 +132,7 @@ export async function POST() {
     return NextResponse.json({ mealPlan: saved });
   } catch (err) {
     console.error('[meal-plan] error:', (err as Error).message);
-    void logAiUsage({
+    await logAiUsage({
       userId: user.id, feature: 'meal_plan', model: MODELS.TEXT,
       inputTokens: 0, outputTokens: 0, status: 'error', latencyMs: Date.now() - startedAt,
     });

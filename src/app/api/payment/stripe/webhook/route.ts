@@ -2,6 +2,7 @@ import { getStripe } from '@/lib/stripe/client';
 import { activateStripeSubscription } from '@/lib/stripe/activateSubscription';
 import { createServiceClient } from '@/lib/supabase/service';
 import { recalculateVisualPlanCache } from '@/lib/subscriptionCache';
+import { requireSupabaseSuccess } from '@/lib/supabaseErrors';
 import { withWebhookIdempotency } from '@/lib/webhookIdempotency';
 import { NextRequest, NextResponse } from 'next/server';
 import type Stripe from 'stripe';
@@ -64,9 +65,9 @@ async function processStripeEvent(event: Stripe.Event): Promise<void> {
     const subscriptionId = (invoice as any).subscription as string | undefined;
     if (!subscriptionId) return;
 
-    await db.from('subscriptions')
+    await requireSupabaseSuccess(db.from('subscriptions')
       .update({ status: 'payment_failed', mp_status: 'cancelled' })
-      .eq('provider_subscription_id', subscriptionId);
+      .eq('provider_subscription_id', subscriptionId));
     console.log(`[stripe/webhook] falha de pagamento sub=${subscriptionId}`);
     return;
   }
@@ -77,9 +78,9 @@ async function processStripeEvent(event: Stripe.Event): Promise<void> {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const userId = (sub.metadata as any)?.userId as string | undefined;
 
-    await db.from('subscriptions')
+    await requireSupabaseSuccess(db.from('subscriptions')
       .update({ mp_status: 'cancelled', status: 'canceled', canceled_at: new Date().toISOString() })
-      .eq('provider_subscription_id', sub.id);
+      .eq('provider_subscription_id', sub.id));
 
     if (userId) await recalculateVisualPlanCache(db, userId);
     console.log(`[stripe/webhook] cancelamento user=${userId ?? '?'} sub=${sub.id}`);
@@ -118,9 +119,9 @@ async function processStripeEvent(event: Stripe.Event): Promise<void> {
       .eq('provider_subscription_id', subscriptionId)
       .maybeSingle();
 
-    await db.from('subscriptions')
+    await requireSupabaseSuccess(db.from('subscriptions')
       .update({ status: 'canceled', mp_status: 'cancelled', canceled_at: new Date().toISOString() })
-      .eq('provider_subscription_id', subscriptionId);
+      .eq('provider_subscription_id', subscriptionId));
 
     if (row?.user_id) await recalculateVisualPlanCache(db, row.user_id);
     console.log(`[stripe/webhook] estorno sub=${subscriptionId}`);

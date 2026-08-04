@@ -18,10 +18,11 @@ export async function searchKnowledge(
   query: string,
   matchCount = 4,
   matchThreshold = 0.55,
+  userId: string | null = null,
 ): Promise<KnowledgeResult[]> {
   try {
     const supabase = createClient();
-    const embedding = await generateEmbedding(query);
+    const embedding = await generateEmbedding(query, userId);
 
     const { data, error } = await supabase.rpc('match_knowledge_chunks', {
       query_embedding: embedding,

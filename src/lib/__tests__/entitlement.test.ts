@@ -117,10 +117,11 @@ describe('selectEntitlement', () => {
     expect(result.reason).toBe('payment_failed');
   });
 
-  it('assinatura "active" sem current_period_end é tratada como válida indefinidamente', () => {
+  it('assinatura "active" sem current_period_end NÃO concede PRO indefinidamente (round 3)', () => {
     const rows = [row({ id: 'no-end-date', status: 'active', current_period_end: null })];
     const result = selectEntitlement(rows, NOW);
-    expect(result.isPro).toBe(true);
+    expect(result.isPro).toBe(false);
+    expect(result.reason).toBe('expired');
   });
 
   it('plan payment_type pix (avulso) ativo mas vencido não concede PRO', () => {

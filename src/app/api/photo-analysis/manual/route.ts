@@ -94,7 +94,7 @@ export async function POST(req: Request) {
       ],
     });
 
-    void logAiUsage({
+    await logAiUsage({
       userId: user.id,
       feature: 'photo_analysis_manual',
       model: MODELS.TEXT,
