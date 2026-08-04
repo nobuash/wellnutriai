@@ -1,9 +1,8 @@
 import { getPayment, PLANS, type PlanInterval } from '@/lib/mercadopago/client';
+import { activateMpPayment } from '@/lib/mercadopago/activatePayment';
 import { checkDistributedRateLimit } from '@/lib/distributedRateLimit';
 import { consentReasonMessage, requireCurrentConsent } from '@/lib/consentCheck';
 import { createClient } from '@/lib/supabase/server';
-import { createServiceClient } from '@/lib/supabase/service';
-import { requireSupabaseSuccess } from '@/lib/supabaseErrors';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 
@@ -105,38 +104,30 @@ export async function POST(req: Request) {
     console.log(`[payment/card] status=${status} detail=${statusDetail} id=${result.id}`);
 
     if (status === 'approved') {
-      const durationDays = plan.durationDays;
-      const expiresAt = new Date();
-      expiresAt.setDate(expiresAt.getDate() + durationDays);
+      // Fonte única de ativação do Mercado Pago (round 4): esta rota
+      // NÃO calcula mais sua própria data de expiração. Antes,
+      // card/route.ts, o webhook e /api/payment/verify tinham três
+      // implementações divergentes; se a lógica de validação/expiração
+      // mudasse num lugar (como o round 2 fez ao trocar Date.now() por
+      // date_approved), os outros dois ficavam desatualizados sem
+      // ninguém perceber. activateMpPayment() busca o pagamento de
+      // novo na API do MP (nunca confia no `result` do create()),
+      // valida dono/valor/moeda e usa date_approved do provedor.
+      const activation = await activateMpPayment(Number(result.id), user.id);
+      console.log(`[payment/card] ativação outcome=${activation.outcome}`);
 
-      // subscriptions e profiles.plan só aceitam escrita via
-      // service_role (RLS + trigger protect_plan_column) — ver
-      // 007_normalize_subscriptions.sql e 005_security_hardening.sql.
-      const service = createServiceClient();
-
-      await requireSupabaseSuccess(service.from('subscriptions').upsert(
-        {
-          user_id: user.id,
-          plan: 'pro',
-          mp_subscription_id: String(result.id),
-          mp_status: 'authorized',
-          // 'one_time_card': cartão avulso do MP, não confundir com
-          // assinatura recorrente — ver src/lib/subscriptionTypes.ts.
-          payment_type: 'one_time_card',
-          expires_at: expiresAt.toISOString(),
-          provider: 'mercadopago',
-          provider_subscription_id: String(result.id),
-          provider_payment_id: String(result.id),
-          status: 'active',
-          billing_interval: planInterval,
-          current_period_end: expiresAt.toISOString(),
-          cancel_at_period_end: false,
-          canceled_at: null,
-        },
-        { onConflict: 'mp_subscription_id' }
-      ));
-
-      await requireSupabaseSuccess(service.from('profiles').update({ plan: 'pro' }).eq('id', user.id));
+      if (activation.outcome !== 'activated') {
+        // Cobrança foi aprovada no MP mas a ativação recusou por outro
+        // motivo (ex: valor não confere) — não deveria acontecer numa
+        // cobrança que nós mesmos acabamos de criar com o valor certo,
+        // mas se acontecer é mais seguro reportar erro do que fingir
+        // sucesso.
+        console.error(`[payment/card] cobrança approved mas ativação não completou: ${activation.outcome}`);
+        return NextResponse.json(
+          { error: 'Pagamento aprovado, mas houve um problema ao liberar seu acesso PRO. Contate o suporte com o ID: ' + result.id },
+          { status: 502 },
+        );
+      }
     }
 
     const rejectionMessages: Record<string, string> = {
