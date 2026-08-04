@@ -69,6 +69,45 @@ reais arrisca quebrar pagamento em produção sem que isso apareça em
 (`'strict-dynamic'` + nonce, por exemplo) em um ambiente de staging antes
 de aplicar em produção.
 
+## Gerenciamento de secrets
+
+- `.gitignore` ignora `.env*` por padrão, com exceção explícita só pra
+  `.env.example` (round 4) — mais seguro que listar sufixos
+  específicos (`.env.local`, `.env*.local`), que deixavam passar
+  despercebido um `.env.production`/`.env.staging` sem sufixo `.local`.
+- **Verificado (round 4)**: nenhum arquivo `.env` real (só
+  `.env.example`, que é template com placeholders) foi commitado em
+  nenhum momento do histórico do repositório — checado via
+  `git log --all --diff-filter=A --name-only` para nomes de arquivo e
+  `git log --all -p` com grep por padrões de chave conhecidos
+  (`sk_live_`, `sk_test_`, `whsec_`, JWT, chaves de API do Google,
+  tokens do GitHub/Slack). Nenhum resultado além dos placeholders do
+  `.env.example`.
+- **GitHub secret scanning e push protection**: já estavam habilitados
+  automaticamente (repositório público). Confirmado via
+  `gh api repos/nobuash/wellnutriai --jq '.security_and_analysis'`.
+- **Dependabot**: alertas de vulnerabilidade e atualizações de
+  segurança habilitados via API nesta rodada (estavam desligados).
+  `.github/dependabot.yml` adicionado para PRs semanais de
+  atualização de dependências (npm + GitHub Actions), com major
+  versions sempre em PR individual (nunca agrupadas).
+- **Rotação de chaves — não automatizada, processo manual**: se
+  qualquer chave (Stripe, Mercado Pago, Supabase service role, OpenAI)
+  precisar ser rotacionada (suspeita de vazamento, desligamento de
+  colaborador com acesso, rotina periódica), gere a nova chave no
+  painel do provedor, atualize a variável correspondente no Vercel
+  (Production **e** Preview separadamente) e revogue a chave antiga só
+  depois de confirmar que o deploy novo está saudável. Não há
+  automação disso hoje — ficou fora do escopo por exigir integração
+  com a API de cada provedor (Stripe, Mercado Pago, Supabase, OpenAI
+  têm mecanismos de rotação distintos entre si).
+- **Ambientes com chaves diferentes**: hoje o projeto usa as mesmas
+  variáveis do Vercel para Production e Preview (confirmado em
+  `docs/deployment-checklist.md`). Recomendado usar chaves de TESTE do
+  Stripe/Mercado Pago em Preview e chaves reais só em Production — não
+  implementado nesta rodada (é uma configuração no painel do Vercel,
+  não uma mudança de código).
+
 ## O que exige configuração externa (não implementado em código)
 
 - **Cloudflare Turnstile**: pacote instalado
