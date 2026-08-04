@@ -88,6 +88,30 @@ export async function activateStripeSubscription(
 
   await recalculateVisualPlanCache(service, userId);
 
+  if (isActive) {
+    // Fecha o ciclo de vida da reserva de checkout (round 4, item 4):
+    // qualquer reserva 'session_created' deste usuário para Stripe vira
+    // 'completed'. Não precisa casar pelo checkout_session_id exato —
+    // o índice único parcial de 023_checkout_reservations.sql já
+    // garante que só existe UMA reserva 'session_created' por
+    // (user_id, provider) por vez, então não há ambiguidade. Não
+    // bloqueante: a assinatura já foi ativada de verdade acima: uma
+    // falha aqui só deixa uma reserva "presa" em session_created, que
+    // nunca mais volta a bloquear nada (o índice único só cobre
+    // reserved/session_created — o próximo checkout deste usuário só
+    // aconteceria depois de cancelar esta assinatura, quando não
+    // haveria mais reserva alguma disputando o slot).
+    const { error: completeReservationError } = await service
+      .from('checkout_reservations')
+      .update({ status: 'completed' })
+      .eq('user_id', userId)
+      .eq('provider', 'stripe')
+      .eq('status', 'session_created');
+    if (completeReservationError) {
+      console.error('[activateStripeSubscription] falha ao marcar reserva como completed:', completeReservationError);
+    }
+  }
+
   if (!isActive) {
     return { outcome: 'inactive', status: normalizedStatus };
   }

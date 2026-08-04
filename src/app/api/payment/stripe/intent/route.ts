@@ -5,6 +5,7 @@ import { consentReasonMessage, requireCurrentConsent } from '@/lib/consentCheck'
 import { findActiveStripeSubscription } from '@/lib/stripe/activateSubscription';
 import { createClient } from '@/lib/supabase/server';
 import { createServiceClient } from '@/lib/supabase/service';
+import { logSupabaseWriteFailure } from '@/lib/supabaseErrors';
 import { NextResponse } from 'next/server';
 
 export const runtime = 'nodejs';
@@ -93,7 +94,15 @@ export async function POST(req: Request) {
       // tentativa marcando como expirada, sem criar sessão nesta
       // chamada (evita duas gravações concorrentes na mesma janela;
       // o cliente tenta de novo e cai no caminho normal).
-      await service.from('checkout_reservations').update({ status: 'expired' }).eq('id', existingReservation.id);
+      const { error: expireError } = await service
+        .from('checkout_reservations')
+        .update({ status: 'expired' })
+        .eq('id', existingReservation.id);
+      // Não bloqueante: mesmo se a atualização falhar, ainda é seguro
+      // pedir pro usuário tentar de novo (a pior consequência é a
+      // reserva antiga continuar "reserved" até a próxima tentativa
+      // tropeçar nela de novo e tentar expirar mais uma vez).
+      logSupabaseWriteFailure('stripe-intent', expireError);
       return NextResponse.json(
         { error: 'Sua tentativa anterior expirou. Tente novamente.' },
         { status: 409 },
@@ -152,16 +161,39 @@ export async function POST(req: Request) {
       { idempotencyKey: reservation.idempotency_key },
     );
 
-    await service
+    if (!session.client_secret) {
+      // Sessão foi criada mas sem client_secret — o Embedded Checkout
+      // do frontend não tem como funcionar sem isso. Trata como falha
+      // (libera a reserva) em vez de devolver um clientSecret nulo que
+      // quebraria silenciosamente no cliente.
+      console.error(`[stripe/intent] sessão ${session.id} criada sem client_secret`);
+      const { error: failError } = await service
+        .from('checkout_reservations')
+        .update({ status: 'failed' })
+        .eq('id', reservation.id);
+      logSupabaseWriteFailure('stripe-intent', failError);
+      return NextResponse.json({ error: 'Erro ao criar sessão de pagamento. Tente novamente.' }, { status: 502 });
+    }
+
+    const { error: markCreatedError } = await service
       .from('checkout_reservations')
       .update({ status: 'session_created', checkout_session_id: session.id })
       .eq('id', reservation.id);
+    // Não bloqueante: a sessão real já existe na Stripe e o
+    // clientSecret já está pronto pra devolver — não vale a pena negar
+    // o checkout ao usuário por causa de uma falha em registrar o
+    // session_id localmente. Fica como alerta pra investigar; na pior
+    // hipótese, uma segunda tentativa concorrente não vai encontrar
+    // este reservation por checkout_session_id, mas o índice único por
+    // (user_id, provider) continua protegendo contra duas sessões.
+    logSupabaseWriteFailure('stripe-intent', markCreatedError);
 
     return NextResponse.json({ clientSecret: session.client_secret });
   } catch (err: unknown) {
     // Reserva não pode ficar "reserved" para sempre em caso de erro —
     // libera pra uma nova tentativa.
-    await service.from('checkout_reservations').update({ status: 'failed' }).eq('id', reservation.id);
+    const { error: failError } = await service.from('checkout_reservations').update({ status: 'failed' }).eq('id', reservation.id);
+    logSupabaseWriteFailure('stripe-intent', failError);
     const stripeErr = err as { message?: string; code?: string };
     console.error('[stripe/intent] error:', stripeErr?.message, stripeErr?.code);
     return NextResponse.json({ error: stripeErr?.message ?? 'Erro ao criar sessão de pagamento' }, { status: 500 });
