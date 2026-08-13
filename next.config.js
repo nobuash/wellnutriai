@@ -135,14 +135,30 @@ const nextConfig = {
 // ambiente sem a qual o app não roda estiver ausente — em vez de um
 // erro obscuro em runtime na primeira requisição que precisar dela.
 // (next.config.js roda puro Node/CommonJS, sem o pipeline de TS do
-// Next, por isso a checagem é duplicada aqui em JS simples em vez de
-// reusar src/lib/env.ts — que continua sendo a validação usada dentro
-// do app.)
+// Next, por isso a checagem é em JS simples aqui mesmo.)
+//
+// CONFIRMADO em produção: NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY estava
+// ausente na Vercel e o build passou normal — só quebrou em runtime,
+// no momento em que um usuário clicava em "Pagar via Cartão"
+// ("Expected publishable key to be of type string, got type undefined
+// instead."). As variáveis do Stripe e do Mercado Pago abaixo nunca
+// tinham sido validadas no build, só usadas com `!` (non-null
+// assertion) direto no código — cada uma dessas é exatamente o tipo
+// de ausência que essa checagem existe pra pegar cedo.
 const REQUIRED_ENV_VARS = [
   'NEXT_PUBLIC_SUPABASE_URL',
   'NEXT_PUBLIC_SUPABASE_ANON_KEY',
   'SUPABASE_SERVICE_ROLE_KEY',
   'OPENAI_API_KEY',
+  'STRIPE_SECRET_KEY',
+  'NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY',
+  'STRIPE_WEBHOOK_SECRET',
+  'STRIPE_PRICE_MONTHLY',
+  'STRIPE_PRICE_QUARTERLY',
+  'STRIPE_PRICE_ANNUAL',
+  'MP_ACCESS_TOKEN',
+  'MP_WEBHOOK_SECRET',
+  'NEXT_PUBLIC_MP_PUBLIC_KEY',
 ];
 
 const missingEnvVars = REQUIRED_ENV_VARS.filter((key) => !process.env[key]);
