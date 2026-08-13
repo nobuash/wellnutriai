@@ -2,6 +2,8 @@ import type { Metadata, Viewport } from 'next';
 import { Lora, Manrope } from 'next/font/google';
 import './globals.css';
 import { Providers } from '@/components/Providers';
+import { GoogleAnalytics } from '@/components/analytics/GoogleAnalytics';
+import { SITE_NAME, SITE_URL } from '@/lib/seo';
 
 const lora = Lora({
   subsets: ['latin'],
@@ -26,10 +28,34 @@ export const viewport: Viewport = {
   userScalable: false,
 };
 
+const TITLE = 'WellNutriAI — Planos alimentares sugeridos por IA';
+const DESCRIPTION =
+  'Receba planos alimentares personalizados, sugeridos por inteligência artificial, com base no seu objetivo e rotina.';
+
 export const metadata: Metadata = {
-  title: 'WellNutriAI — Planos alimentares sugeridos por IA',
-  description:
-    'Receba planos alimentares personalizados, sugeridos por inteligência artificial, com base no seu objetivo e rotina.',
+  metadataBase: new URL(SITE_URL),
+  title: TITLE,
+  description: DESCRIPTION,
+  alternates: {
+    canonical: '/',
+  },
+  robots: {
+    index: true,
+    follow: true,
+  },
+  openGraph: {
+    title: TITLE,
+    description: DESCRIPTION,
+    url: SITE_URL,
+    siteName: SITE_NAME,
+    locale: 'pt_BR',
+    type: 'website',
+  },
+  twitter: {
+    card: 'summary',
+    title: TITLE,
+    description: DESCRIPTION,
+  },
   manifest: '/manifest.json',
   appleWebApp: {
     capable: true,
@@ -48,12 +74,19 @@ export const metadata: Metadata = {
       { url: '/icons/icon-180x180.png', sizes: '180x180' },
     ],
   },
+  // Preenchido via variável de ambiente quando a propriedade for
+  // verificada no Google Search Console — ver .env.example e o
+  // relatório de auditoria para o passo a passo manual.
+  ...(process.env.NEXT_PUBLIC_GSC_VERIFICATION
+    ? { verification: { google: process.env.NEXT_PUBLIC_GSC_VERIFICATION } }
+    : {}),
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="pt-BR" className={`${lora.variable} ${manrope.variable}`}>
       <body>
+        <GoogleAnalytics />
         <Providers>{children}</Providers>
       </body>
     </html>

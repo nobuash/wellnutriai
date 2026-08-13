@@ -1,6 +1,11 @@
+import type { Metadata } from 'next';
 import { LegalPageLayout } from '@/components/LegalPageLayout';
 
-export const metadata = { title: 'Termos de Uso — WellNutriAI' };
+export const metadata: Metadata = {
+  title: 'Termos de Uso — WellNutriAI',
+  description: 'Termos que regulam o acesso e uso da plataforma WellNutriAI.',
+  alternates: { canonical: '/terms' },
+};
 
 // [PLACEHOLDER PARA O MANTENEDOR]: este texto é um rascunho estrutural,
 // não um documento jurídico pronto. Preencha os campos marcados e peça

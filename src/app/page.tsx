@@ -2,11 +2,13 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { Button } from '@/components/ui/Button';
 import { SocialLinks } from '@/components/SocialLinks';
+import { HomeJsonLd } from '@/components/seo/HomeJsonLd';
 import { Brain, Camera, Check, MessageCircle, Sparkles } from 'lucide-react';
 
 export default function LandingPage() {
   return (
     <div className="min-h-screen bg-background">
+      <HomeJsonLd />
       {/* NAV */}
       <nav className="border-b border-divider bg-background/90 backdrop-blur sticky top-0 z-10">
         <div className="mx-auto max-w-6xl px-6 h-16 flex items-center justify-between">
@@ -186,6 +188,13 @@ export default function LandingPage() {
       {/* FOOTER */}
       <footer className="border-t border-divider py-10 text-center text-sm text-ink-muted">
         <SocialLinks className="justify-center mb-4" />
+        <nav className="flex flex-wrap items-center justify-center gap-x-5 gap-y-1.5 mb-4 text-xs">
+          <Link href="/privacy" className="hover:text-ink-secondary transition-colors">Política de Privacidade</Link>
+          <Link href="/terms" className="hover:text-ink-secondary transition-colors">Termos de Uso</Link>
+          <Link href="/cancellation" className="hover:text-ink-secondary transition-colors">Cancelamento</Link>
+          <Link href="/data-retention" className="hover:text-ink-secondary transition-colors">Retenção de Dados</Link>
+          <Link href="/fair-use" className="hover:text-ink-secondary transition-colors">Uso Justo</Link>
+        </nav>
         <p>© {new Date().getFullYear()} WellNutriAI. Todos os direitos reservados.</p>
         <p className="mt-1 max-w-2xl mx-auto px-6">
           O WellNutriAI fornece sugestões alimentares geradas por IA com caráter informativo e
