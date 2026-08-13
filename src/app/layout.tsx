@@ -2,7 +2,7 @@ import type { Metadata, Viewport } from 'next';
 import { Lora, Manrope } from 'next/font/google';
 import './globals.css';
 import { Providers } from '@/components/Providers';
-import { GoogleAnalytics } from '@/components/analytics/GoogleAnalytics';
+import { ConsentBanner } from '@/components/analytics/ConsentBanner';
 import { SITE_NAME, SITE_URL } from '@/lib/seo';
 
 const lora = Lora({
@@ -86,8 +86,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="pt-BR" className={`${lora.variable} ${manrope.variable}`}>
       <body>
-        <GoogleAnalytics />
         <Providers>{children}</Providers>
+        <ConsentBanner />
       </body>
     </html>
   );
