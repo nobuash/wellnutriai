@@ -65,12 +65,12 @@ export default function MealPlanPage() {
   if (isLoading) return <Card>Carregando...</Card>;
 
   const medicalBlockCard = medicalBlock && (
-    <Card className="border-amber-200 bg-amber-50">
+    <Card className="border-warning/30 bg-warning/10">
       <div className="flex gap-3">
-        <HeartPulse className="h-5 w-5 text-amber-600 shrink-0 mt-0.5" />
+        <HeartPulse className="h-5 w-5 text-warning shrink-0 mt-0.5" />
         <div>
-          <h3 className="font-semibold text-amber-900 mb-1">Não geramos um plano automático para essa condição</h3>
-          <p className="text-sm text-amber-800">{medicalBlock}</p>
+          <h3 className="font-semibold text-warning mb-1">Não geramos um plano automático para essa condição</h3>
+          <p className="text-sm text-warning/90">{medicalBlock}</p>
         </div>
       </div>
     </Card>
@@ -81,9 +81,9 @@ export default function MealPlanPage() {
       <div className="space-y-4">
         {medicalBlockCard}
         <Card className="text-center py-12">
-          <Sparkles className="h-10 w-10 text-brand-600 mx-auto mb-4" />
+          <Sparkles className="h-10 w-10 text-primary-600 mx-auto mb-4" />
           <h2 className="text-xl font-semibold mb-2">Gere seu primeiro plano</h2>
-          <p className="text-slate-500 mb-6 max-w-md mx-auto">
+          <p className="text-ink-muted mb-6 max-w-md mx-auto">
             Com base nas informações do questionário, a IA vai sugerir um plano alimentar personalizado.
           </p>
           <div className="flex gap-2 justify-center">
@@ -104,8 +104,8 @@ export default function MealPlanPage() {
       {medicalBlockCard}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold">Plano alimentar sugerido</h1>
-          <p className="text-sm text-slate-500">
+          <h1 className="font-display text-2xl text-ink">Plano alimentar sugerido</h1>
+          <p className="text-sm text-ink-muted">
             Gerado em {formatDate(mealPlan.created_at)} · Sugestão de IA
           </p>
         </div>
@@ -116,7 +116,7 @@ export default function MealPlanPage() {
       </div>
 
       <Card>
-        <p className="text-slate-700 mb-4">{content?.summary}</p>
+        <p className="text-ink-secondary mb-4">{content?.summary}</p>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-3">
           <Stat label="Calorias" value={`${content?.total_calories ?? '—'} kcal`} />
           <Stat label="Proteína" value={`${content?.macros?.protein_g ?? '—'}g`} />
@@ -124,15 +124,15 @@ export default function MealPlanPage() {
           <Stat label="Gorduras" value={`${content?.macros?.fat_g ?? '—'}g`} />
         </div>
         {content?.daily_water_ml && (
-          <div className="flex items-center gap-2 mt-2 rounded-lg bg-blue-50 border border-blue-100 px-4 py-3">
-            <Droplets className="h-5 w-5 text-blue-500 shrink-0" />
+          <div className="flex items-center gap-2 mt-2 rounded-md bg-info/10 border border-info/20 px-4 py-3">
+            <Droplets className="h-5 w-5 text-info shrink-0" />
             <div>
-              <p className="text-sm font-medium text-blue-800">
+              <p className="text-sm font-medium text-info">
                 Água diária recomendada: {content.daily_water_ml >= 1000
                   ? `${(content.daily_water_ml / 1000).toFixed(1).replace('.', ',')} L`
                   : `${content.daily_water_ml} ml`}
               </p>
-              <p className="text-xs text-blue-600">Distribua ao longo do dia, especialmente antes e durante exercícios.</p>
+              <p className="text-xs text-info/80">Distribua ao longo do dia, especialmente antes e durante exercícios.</p>
             </div>
           </div>
         )}
@@ -143,17 +143,17 @@ export default function MealPlanPage() {
           <Card key={i}>
             <div className="flex items-center justify-between mb-3">
               <h3 className="font-semibold">{meal.name}</h3>
-              <span className="text-sm text-slate-500">{meal.time}</span>
+              <span className="text-sm text-ink-muted">{meal.time}</span>
             </div>
             <ul className="space-y-1 mb-3">
               {meal.foods.map((f, j) => (
                 <li key={j} className="flex justify-between text-sm">
-                  <span className="text-slate-700">{f.item}</span>
-                  <span className="text-slate-500">{f.quantity}</span>
+                  <span className="text-ink-secondary">{f.item}</span>
+                  <span className="text-ink-muted">{f.quantity}</span>
                 </li>
               ))}
             </ul>
-            <div className="flex gap-4 text-xs text-slate-500 pt-3 border-t border-slate-100">
+            <div className="flex gap-4 text-xs text-ink-muted pt-3 border-t border-divider">
               <span>{meal.calories} kcal</span>
               <span>P: {meal.macros.protein_g}g</span>
               <span>C: {meal.macros.carbs_g}g</span>
@@ -166,7 +166,7 @@ export default function MealPlanPage() {
       {content?.observations && content.observations.length > 0 && (
         <Card>
           <h3 className="font-semibold mb-3">Observações</h3>
-          <ul className="space-y-2 text-sm text-slate-700 list-disc pl-5">
+          <ul className="space-y-2 text-sm text-ink-secondary list-disc pl-5">
             {content.observations.map((obs, i) => (
               <li key={i}>{obs}</li>
             ))}
@@ -184,9 +184,9 @@ export default function MealPlanPage() {
 
 function Stat({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-lg bg-slate-50 p-3">
-      <p className="text-xs text-slate-500 uppercase">{label}</p>
-      <p className="font-semibold mt-1">{value}</p>
+    <div className="rounded-sm bg-surface-secondary p-3">
+      <p className="text-xs text-ink-muted uppercase tracking-wide">{label}</p>
+      <p className="font-semibold text-ink mt-1">{value}</p>
     </div>
   );
 }

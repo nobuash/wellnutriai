@@ -135,19 +135,19 @@ export default function PricingPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold">Planos</h1>
-        <p className="text-sm text-slate-500">Escolha o plano ideal para você.</p>
+        <h1 className="font-display text-2xl text-ink">Planos</h1>
+        <p className="text-sm text-ink-muted mt-1">Escolha o plano ideal para você.</p>
       </div>
 
       <div className="grid md:grid-cols-2 gap-4">
         {/* Free */}
         <Card>
-          <h3 className="font-bold text-lg mb-1">Free</h3>
-          <p className="text-3xl font-bold mb-6">R$ 0</p>
+          <h3 className="font-display text-lg text-ink mb-1">Free</h3>
+          <p className="text-3xl font-semibold text-ink mb-6">R$ 0</p>
           <ul className="space-y-2 mb-6">
             {['1 plano alimentar por mês', 'Sem chat com IA', 'Sem análise de refeição'].map((f) => (
-              <li key={f} className="flex items-center gap-2 text-sm text-slate-700">
-                <Check className="h-4 w-4 text-brand-600 shrink-0" />{f}
+              <li key={f} className="flex items-center gap-2 text-sm text-ink-secondary">
+                <Check className="h-4 w-4 text-primary-600 shrink-0" />{f}
               </li>
             ))}
           </ul>
@@ -157,33 +157,33 @@ export default function PricingPage() {
         </Card>
 
         {/* Pro */}
-        <Card className="border-brand-500 ring-1 ring-brand-500">
+        <Card className="border-primary-300 ring-1 ring-primary-300">
           <div className="flex items-center gap-2 mb-3">
-            <h3 className="font-bold text-lg">Pro</h3>
-            <Sparkles className="h-4 w-4 text-brand-600" />
+            <h3 className="font-display text-lg text-ink">Pro</h3>
+            <Sparkles className="h-4 w-4 text-primary-600" />
           </div>
 
           {/* Seletor de intervalo */}
           {(
-            <div className="flex rounded-lg border border-slate-200 p-1 mb-4 bg-slate-50">
+            <div className="flex rounded-md border border-border p-1 mb-4 bg-surface-secondary">
               {(Object.keys(PLANS) as PlanInterval[]).map((interval) => (
                 <button
                   key={interval}
                   onClick={() => setSelectedInterval(interval)}
-                  className={`flex-1 relative rounded-md py-1.5 text-xs font-medium transition-all ${
+                  className={`flex-1 relative rounded-sm py-1.5 text-xs font-medium transition-all duration-200 ${
                     selectedInterval === interval
-                      ? 'bg-white text-brand-700 shadow-sm'
-                      : 'text-slate-500 hover:text-slate-700'
+                      ? 'bg-surface text-primary-700 shadow-soft'
+                      : 'text-ink-muted hover:text-ink-secondary'
                   }`}
                 >
                   {INTERVAL_LABELS[interval]}
                   {interval === 'annual' && (
-                    <span className="absolute -top-2.5 left-1/2 -translate-x-1/2 px-1.5 py-0 rounded text-[9px] font-bold bg-brand-600 text-white leading-4 whitespace-nowrap">
+                    <span className="absolute -top-2.5 left-1/2 -translate-x-1/2 px-1.5 py-0 rounded-full text-[9px] font-bold bg-primary-600 text-white leading-4 whitespace-nowrap">
                       Recomendado
                     </span>
                   )}
                   {interval !== 'annual' && PLANS[interval].discountPercent > 0 && (
-                    <span className="absolute -top-2 -right-1 px-1 py-0 rounded text-[9px] font-bold bg-green-500 text-white leading-4">
+                    <span className="absolute -top-2 -right-1 px-1 py-0 rounded-full text-[9px] font-bold bg-primary-500 text-white leading-4">
                       -{PLANS[interval].discountPercent}%
                     </span>
                   )}
@@ -194,29 +194,29 @@ export default function PricingPage() {
 
           {/* Preço */}
           <div className="mb-1">
-            <p className="text-3xl font-bold">
+            <p className="text-3xl font-semibold text-ink">
               R$ {formatBRL(plan.monthlyAmount)}
-              <span className="text-base font-normal text-slate-500">/mês</span>
+              <span className="text-base font-normal text-ink-muted">/mês</span>
             </p>
             {plan.discountPercent > 0 && (
-              <p className="text-sm text-slate-500">
+              <p className="text-sm text-ink-muted">
                 Cobrado R$ {formatBRL(plan.amount)}{' '}
                 {selectedInterval === 'quarterly' ? 'a cada 3 meses' : 'por ano'}
-                {' '}· <span className="text-green-600 font-medium">economia de {plan.discountPercent}%</span>
+                {' '}· <span className="text-primary-600 font-medium">economia de {plan.discountPercent}%</span>
               </p>
             )}
           </div>
 
           {currentPlan === 'pro' && expiresAt && (
-            <p className="text-xs text-slate-500 mb-4">
+            <p className="text-xs text-ink-muted mb-4">
               Acesso PRO válido até {expiresAt.toLocaleDateString('pt-BR')}
             </p>
           )}
 
           <ul className="space-y-2 mb-6 mt-4">
             {['Até 6 planos alimentares por mês, editáveis pelo chat', 'Chat com IA — uso amplo, sujeito à política de uso justo', 'Até 30 análises de refeição por mês (foto ou manual)', 'Suporte prioritário'].map((f) => (
-              <li key={f} className="flex items-center gap-2 text-sm text-slate-700">
-                <Check className="h-4 w-4 text-brand-600 shrink-0" />{f}
+              <li key={f} className="flex items-center gap-2 text-sm text-ink-secondary">
+                <Check className="h-4 w-4 text-primary-600 shrink-0" />{f}
               </li>
             ))}
           </ul>
@@ -254,36 +254,36 @@ export default function PricingPage() {
 
       {entitlement?.isPro && (
         <Card>
-          <h3 className="font-bold mb-3">Sua assinatura</h3>
-          <div className="space-y-1 text-sm text-slate-600 mb-4">
+          <h3 className="font-display text-lg text-ink mb-3">Sua assinatura</h3>
+          <div className="space-y-1 text-sm text-ink-secondary mb-4">
             <p>
               Pagamento via{' '}
-              <strong>
+              <strong className="text-ink">
                 {entitlement.provider === 'stripe' ? 'cartão (Stripe)' : entitlement.paymentType === 'pix' ? 'PIX' : 'cartão (Mercado Pago)'}
               </strong>
             </p>
             {entitlement.cancelAtPeriodEnd ? (
-              <p className="text-amber-600">
+              <p className="text-warning">
                 Renovação automática cancelada — seu acesso PRO continua até{' '}
                 <strong>{expiresAt?.toLocaleDateString('pt-BR')}</strong>.
               </p>
             ) : isRecurring ? (
               <p>
                 Renovação automática ativa. Próxima cobrança em{' '}
-                <strong>{expiresAt?.toLocaleDateString('pt-BR')}</strong>.
+                <strong className="text-ink">{expiresAt?.toLocaleDateString('pt-BR')}</strong>.
               </p>
             ) : (
               <p>
                 Sem renovação automática. Acesso válido até{' '}
-                <strong>{expiresAt?.toLocaleDateString('pt-BR')}</strong> — para continuar, faça um novo pagamento.
+                <strong className="text-ink">{expiresAt?.toLocaleDateString('pt-BR')}</strong> — para continuar, faça um novo pagamento.
               </p>
             )}
           </div>
 
           {isRecurring && !entitlement.cancelAtPeriodEnd && (
             confirmingCancel ? (
-              <div className="rounded-lg border border-red-200 bg-red-50 p-4 space-y-3">
-                <p className="text-sm text-red-700">
+              <div className="rounded-md border border-error/30 bg-error/5 p-4 space-y-3">
+                <p className="text-sm text-error">
                   Tem certeza? A renovação automática será cancelada, mas você mantém acesso PRO até{' '}
                   {expiresAt?.toLocaleDateString('pt-BR')}.
                 </p>
@@ -310,12 +310,12 @@ export default function PricingPage() {
         </Card>
       )}
 
-      <Card className="bg-slate-50 border-slate-200">
-        <div className="flex gap-3 items-start text-sm text-slate-600">
-          <AlertCircle className="h-4 w-4 shrink-0 mt-0.5 text-slate-400" />
+      <Card className="bg-surface-secondary border-border">
+        <div className="flex gap-3 items-start text-sm text-ink-secondary">
+          <AlertCircle className="h-4 w-4 shrink-0 mt-0.5 text-ink-muted" />
           <p>
-            O pagamento é processado com segurança pelo <strong>Mercado Pago</strong> ou pela{' '}
-            <strong>Stripe</strong> (cartão internacional). Não armazenamos dados do seu cartão. O PIX ativa
+            O pagamento é processado com segurança pelo <strong className="text-ink">Mercado Pago</strong> ou pela{' '}
+            <strong className="text-ink">Stripe</strong> (cartão internacional). Não armazenamos dados do seu cartão. O PIX ativa
             o PRO pelo período escolhido e pode ser renovado a qualquer momento.
           </p>
         </div>
@@ -403,16 +403,16 @@ function PixModal({ pixData, onClose, onCopy }: {
   }
 
   return (
-    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl p-6 max-w-sm w-full space-y-4 shadow-xl">
+    <div className="fixed inset-0 bg-ink/50 z-50 flex items-center justify-center p-4">
+      <div className="bg-surface rounded-lg p-6 max-w-sm w-full space-y-4 shadow-soft-lg">
         <div className="flex items-center justify-between">
-          <h2 className="text-lg font-bold">Pague via PIX</h2>
-          <button onClick={onClose} className="text-slate-400 hover:text-slate-600">
+          <h2 className="font-display text-lg text-ink">Pague via PIX</h2>
+          <button onClick={onClose} className="text-ink-muted hover:text-ink-secondary transition-colors duration-200">
             <X className="h-5 w-5" />
           </button>
         </div>
 
-        <p className="text-sm text-slate-500 text-center">
+        <p className="text-sm text-ink-muted text-center">
           Escaneie o QR code ou copie o código. O plano será ativado automaticamente após o pagamento.
         </p>
 
@@ -423,7 +423,7 @@ function PixModal({ pixData, onClose, onCopy }: {
               alt="QR Code PIX"
               width={200}
               height={200}
-              className="rounded-lg border border-slate-200"
+              className="rounded-sm border border-border"
             />
           </div>
         )}
@@ -437,8 +437,8 @@ function PixModal({ pixData, onClose, onCopy }: {
         </Button>
 
         <div className="flex items-center gap-2 justify-center">
-          <span className="h-2 w-2 rounded-full bg-green-400 animate-pulse" />
-          <p className="text-xs text-slate-400">Verificando pagamento automaticamente...</p>
+          <span className="h-2 w-2 rounded-full bg-primary-500 animate-pulse" />
+          <p className="text-xs text-ink-muted">Verificando pagamento automaticamente...</p>
         </div>
       </div>
     </div>

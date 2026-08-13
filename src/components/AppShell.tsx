@@ -26,24 +26,24 @@ export function AppShell({ plan, name, children }: AppShellProps) {
 
       <div className="flex-1 flex flex-col min-w-0">
         {/* Header mobile */}
-        <header className="md:hidden h-14 flex items-center gap-3 px-4 border-b border-slate-200 bg-white sticky top-0 z-10">
+        <header className="md:hidden h-14 flex items-center gap-3 px-4 border-b border-divider bg-surface sticky top-0 z-10">
           <button
             onClick={() => setSidebarOpen(true)}
-            className="p-2 rounded-lg text-slate-600 hover:bg-slate-100"
+            className="p-2 rounded-md text-ink-secondary hover:bg-surface-secondary transition-colors duration-200"
             aria-label="Abrir menu"
           >
-            <Menu className="h-5 w-5" />
+            <Menu className="h-5 w-5" strokeWidth={1.75} />
           </button>
-          <span className="font-semibold text-slate-800">WellNutriAI</span>
+          <span className="font-display font-semibold text-ink">WellNutriAI</span>
         </header>
 
-        <main className="flex-1 overflow-auto">
+        <main className="flex-1 overflow-auto bg-background">
           <div className="mx-auto max-w-5xl p-4 md:p-8 space-y-6">
             {children}
           </div>
-          <footer className="border-t border-slate-100 py-4 px-8 flex items-center justify-center gap-6">
+          <footer className="border-t border-divider py-4 px-8 flex items-center justify-center gap-6">
             <SocialLinks />
-            <p className="text-xs text-slate-400">© {new Date().getFullYear()} WellNutriAI</p>
+            <p className="text-xs text-ink-muted">© {new Date().getFullYear()} WellNutriAI</p>
           </footer>
         </main>
       </div>

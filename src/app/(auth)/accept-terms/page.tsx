@@ -39,14 +39,14 @@ export default function AcceptTermsPage() {
   }
 
   return (
-    <Card className="animate-slide-up max-w-2xl">
-      <h1 className="text-2xl font-bold mb-2">Termo de Responsabilidade</h1>
-      <p className="text-sm text-slate-500 mb-6">
+    <Card className="animate-slide-up max-w-2xl p-8">
+      <h1 className="font-display text-2xl text-ink mb-2">Termo de Responsabilidade</h1>
+      <p className="text-sm text-ink-muted mb-6">
         Para usar o WellNutriAI, é necessário ler e aceitar os termos abaixo.
       </p>
 
-      <div className="rounded-lg border border-slate-200 bg-slate-50 p-5 max-h-96 overflow-y-auto space-y-3 text-sm text-slate-700 leading-relaxed">
-        <p className="font-semibold text-slate-900">TERMO DE RESPONSABILIDADE – WELLNUTRIAI</p>
+      <div className="rounded-md border border-border bg-surface-secondary p-5 max-h-96 overflow-y-auto space-y-3 text-sm text-ink-secondary leading-relaxed">
+        <p className="font-semibold text-ink">TERMO DE RESPONSABILIDADE – WELLNUTRIAI</p>
 
         <p>
           O WellNutriAI é uma plataforma baseada em inteligência artificial que fornece{' '}
@@ -88,16 +88,16 @@ export default function AcceptTermsPage() {
           </li>
         </ol>
 
-        <p className="pt-2 font-medium text-slate-900">
+        <p className="pt-2 font-medium text-ink">
           Ao continuar, você concorda integralmente com estes termos.
         </p>
       </div>
 
       <div className="flex flex-wrap gap-x-4 gap-y-1 mt-4 text-sm">
-        <a href="/terms" target="_blank" rel="noopener noreferrer" className="text-brand-600 underline">Termos de Uso</a>
-        <a href="/privacy" target="_blank" rel="noopener noreferrer" className="text-brand-600 underline">Política de Privacidade</a>
-        <a href="/fair-use" target="_blank" rel="noopener noreferrer" className="text-brand-600 underline">Política de Uso Justo</a>
-        <a href="/cancellation" target="_blank" rel="noopener noreferrer" className="text-brand-600 underline">Política de Cancelamento</a>
+        <a href="/terms" target="_blank" rel="noopener noreferrer" className="text-primary-600 underline">Termos de Uso</a>
+        <a href="/privacy" target="_blank" rel="noopener noreferrer" className="text-primary-600 underline">Política de Privacidade</a>
+        <a href="/fair-use" target="_blank" rel="noopener noreferrer" className="text-primary-600 underline">Política de Uso Justo</a>
+        <a href="/cancellation" target="_blank" rel="noopener noreferrer" className="text-primary-600 underline">Política de Cancelamento</a>
       </div>
 
       <label className="flex items-start gap-3 mt-6 cursor-pointer select-none">
@@ -105,9 +105,9 @@ export default function AcceptTermsPage() {
           type="checkbox"
           checked={checked}
           onChange={(e) => setChecked(e.target.checked)}
-          className="mt-1 h-5 w-5 rounded border-slate-300 text-brand-600 focus:ring-brand-500"
+          className="mt-1 h-5 w-5 rounded-sm border-border text-primary-600 focus:ring-primary-500"
         />
-        <span className="text-sm text-slate-700">
+        <span className="text-sm text-ink-secondary">
           Li e aceito os Termos de Uso e a Política de Privacidade acima. Compreendo que o WellNutriAI
           fornece sugestões geradas por IA e não substitui profissional de saúde.
         </span>
@@ -122,7 +122,7 @@ export default function AcceptTermsPage() {
           await supabase.auth.signOut();
           router.push('/login');
         }}
-        className="w-full text-center text-sm text-slate-500 mt-3 hover:underline"
+        className="w-full text-center text-sm text-ink-muted mt-3 hover:underline"
       >
         Sair
       </button>

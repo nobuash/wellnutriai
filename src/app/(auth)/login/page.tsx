@@ -37,9 +37,9 @@ export default function LoginPage() {
   }
 
   return (
-    <Card className="animate-slide-up">
-      <h1 className="text-2xl font-bold mb-1">Entrar</h1>
-      <p className="text-sm text-slate-500 mb-6">Acesse sua conta WellNutriAI</p>
+    <Card className="animate-slide-up p-8">
+      <h1 className="font-display text-2xl text-ink mb-1.5">Entrar</h1>
+      <p className="text-sm text-ink-muted mb-6">Acesse sua conta WellNutriAI</p>
 
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
         <Input
@@ -58,7 +58,7 @@ export default function LoginPage() {
             error={errors.password?.message}
           />
           <div className="text-right mt-1">
-            <Link href="/forgot-password" className="text-sm text-brand-600 hover:underline">
+            <Link href="/forgot-password" className="text-sm text-primary-600 hover:underline">
               Esqueci minha senha
             </Link>
           </div>
@@ -68,9 +68,9 @@ export default function LoginPage() {
         </Button>
       </form>
 
-      <p className="text-sm text-center text-slate-600 mt-6">
+      <p className="text-sm text-center text-ink-secondary mt-6">
         Não tem conta?{' '}
-        <Link href="/signup" className="text-brand-600 font-medium hover:underline">
+        <Link href="/signup" className="text-primary-600 font-medium hover:underline">
           Criar conta
         </Link>
       </p>

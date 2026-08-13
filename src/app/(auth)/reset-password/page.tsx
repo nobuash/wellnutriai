@@ -67,13 +67,13 @@ export default function ResetPasswordPage() {
 
   if (!hasSession) {
     return (
-      <Card className="animate-slide-up">
-        <h1 className="text-2xl font-bold mb-1">Sessão expirada</h1>
-        <p className="text-sm text-slate-500">
+      <Card className="animate-slide-up p-8">
+        <h1 className="font-display text-2xl text-ink mb-1.5">Sessão expirada</h1>
+        <p className="text-sm text-ink-muted">
           Não encontramos uma sessão de redefinição ativa. Solicite um novo link para continuar.
         </p>
-        <p className="text-sm text-center text-slate-600 mt-6">
-          <Link href="/forgot-password" className="text-brand-600 font-medium hover:underline">
+        <p className="text-sm text-center text-ink-secondary mt-6">
+          <Link href="/forgot-password" className="text-primary-600 font-medium hover:underline">
             Solicitar novo link
           </Link>
         </p>
@@ -82,9 +82,9 @@ export default function ResetPasswordPage() {
   }
 
   return (
-    <Card className="animate-slide-up">
-      <h1 className="text-2xl font-bold mb-1">Redefinir senha</h1>
-      <p className="text-sm text-slate-500 mb-6">Escolha uma nova senha para sua conta.</p>
+    <Card className="animate-slide-up p-8">
+      <h1 className="font-display text-2xl text-ink mb-1.5">Redefinir senha</h1>
+      <p className="text-sm text-ink-muted mb-6">Escolha uma nova senha para sua conta.</p>
 
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
         <Input

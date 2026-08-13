@@ -34,13 +34,13 @@ export default function ForgotPasswordPage() {
 
   if (sent) {
     return (
-      <Card className="animate-slide-up">
-        <h1 className="text-2xl font-bold mb-1">Verifique seu e-mail</h1>
-        <p className="text-sm text-slate-500">
+      <Card className="animate-slide-up p-8">
+        <h1 className="font-display text-2xl text-ink mb-1.5">Verifique seu e-mail</h1>
+        <p className="text-sm text-ink-muted">
           Se houver uma conta associada a esse e-mail, você receberá um link para redefinir sua senha.
         </p>
-        <p className="text-sm text-center text-slate-600 mt-6">
-          <Link href="/login" className="text-brand-600 font-medium hover:underline">
+        <p className="text-sm text-center text-ink-secondary mt-6">
+          <Link href="/login" className="text-primary-600 font-medium hover:underline">
             Voltar para o login
           </Link>
         </p>
@@ -49,9 +49,9 @@ export default function ForgotPasswordPage() {
   }
 
   return (
-    <Card className="animate-slide-up">
-      <h1 className="text-2xl font-bold mb-1">Esqueci minha senha</h1>
-      <p className="text-sm text-slate-500 mb-6">
+    <Card className="animate-slide-up p-8">
+      <h1 className="font-display text-2xl text-ink mb-1.5">Esqueci minha senha</h1>
+      <p className="text-sm text-ink-muted mb-6">
         Informe seu e-mail e enviaremos um link para redefinir sua senha.
       </p>
 
@@ -68,8 +68,8 @@ export default function ForgotPasswordPage() {
         </Button>
       </form>
 
-      <p className="text-sm text-center text-slate-600 mt-6">
-        <Link href="/login" className="text-brand-600 font-medium hover:underline">
+      <p className="text-sm text-center text-ink-secondary mt-6">
+        <Link href="/login" className="text-primary-600 font-medium hover:underline">
           Voltar para o login
         </Link>
       </p>

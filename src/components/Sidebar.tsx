@@ -1,6 +1,7 @@
 'use client';
 
 import { cn } from '@/lib/utils';
+import { Badge } from '@/components/ui/Badge';
 import { createClient } from '@/lib/supabase/client';
 import {
   Camera, ClipboardList, HeadphonesIcon, LayoutDashboard, LogOut,
@@ -51,23 +52,23 @@ export function Sidebar({ plan, name, isOpen, onClose }: SidebarProps) {
       )}
 
       <aside className={cn(
-        'fixed md:static inset-y-0 left-0 z-30 w-64 bg-white border-r border-slate-200 flex flex-col transition-transform duration-300 md:translate-x-0',
+        'fixed md:static inset-y-0 left-0 z-30 w-64 bg-surface border-r border-border flex flex-col transition-transform duration-300 md:translate-x-0',
         isOpen ? 'translate-x-0' : '-translate-x-full',
       )}>
-        <div className="h-16 flex items-center justify-between px-6 border-b border-slate-200 font-bold">
-          <Link href="/" className="flex items-center gap-2">
-            <Image src="/logo.png" alt="WellNutriAI" width={40} height={40} className="object-contain" />
+        <div className="h-16 flex items-center justify-between px-6 border-b border-divider">
+          <Link href="/" className="flex items-center gap-2 font-display font-semibold text-ink">
+            <Image src="/logo.png" alt="WellNutriAI" width={32} height={32} className="object-contain" />
             WellNutriAI
           </Link>
           <button
-            className="md:hidden p-1 rounded text-slate-500 hover:bg-slate-100"
+            className="md:hidden p-1 rounded-sm text-ink-muted hover:bg-surface-secondary"
             onClick={onClose}
           >
             <X className="h-5 w-5" />
           </button>
         </div>
 
-        <nav className="flex-1 p-3 space-y-1 overflow-y-auto">
+        <nav className="flex-1 p-3 space-y-0.5 overflow-y-auto">
           {nav.map(({ href, label, icon: Icon, pro }) => {
             const active = pathname === href || pathname.startsWith(href + '/');
             return (
@@ -76,18 +77,16 @@ export function Sidebar({ plan, name, isOpen, onClose }: SidebarProps) {
                 href={href}
                 onClick={onClose}
                 className={cn(
-                  'flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors',
+                  'flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-colors duration-200',
                   active
-                    ? 'bg-brand-50 text-brand-700 font-medium'
-                    : 'text-slate-600 hover:bg-slate-50'
+                    ? 'bg-primary-50 text-primary-700 font-medium'
+                    : 'text-ink-secondary hover:bg-surface-secondary hover:text-ink'
                 )}
               >
-                <Icon className="h-4 w-4" />
+                <Icon className="h-4 w-4" strokeWidth={1.75} />
                 <span>{label}</span>
                 {pro && plan === 'free' && (
-                  <span className="ml-auto text-[10px] px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 font-semibold">
-                    PRO
-                  </span>
+                  <Badge variant="warning" className="ml-auto">PRO</Badge>
                 )}
               </Link>
             );
@@ -95,34 +94,34 @@ export function Sidebar({ plan, name, isOpen, onClose }: SidebarProps) {
         </nav>
 
         {plan === 'free' && (
-          <div className="mx-3 mb-3 rounded-lg bg-gradient-to-br from-brand-600 to-emerald-700 p-4 text-white">
+          <div className="mx-3 mb-3 rounded-md bg-primary-600 p-4 text-white">
             <div className="flex items-center gap-2 mb-2">
-              <Sparkles className="h-4 w-4" />
+              <Sparkles className="h-4 w-4" strokeWidth={1.75} />
               <span className="font-semibold text-sm">Upgrade para PRO</span>
             </div>
-            <p className="text-xs text-brand-50 mb-3">Mais planos por mês, chat com IA e análise de refeição.</p>
+            <p className="text-xs text-primary-50/90 mb-3 leading-relaxed">Mais planos por mês, chat com IA e análise de refeição.</p>
             <Link
               href="/pricing"
               onClick={onClose}
-              className="block text-center text-xs font-semibold bg-white text-brand-700 rounded-md py-1.5 hover:bg-brand-50"
+              className="block text-center text-xs font-semibold bg-white text-primary-700 rounded-sm py-1.5 hover:bg-primary-50 transition-colors duration-200"
             >
               Fazer upgrade
             </Link>
           </div>
         )}
 
-        <div className="p-3 border-t border-slate-200">
+        <div className="p-3 border-t border-divider">
           <div className="flex items-center justify-between px-2 py-2">
             <div className="min-w-0">
-              <p className="text-sm font-medium truncate">{name || 'Usuário'}</p>
-              <p className="text-xs text-slate-500 uppercase">{plan}</p>
+              <p className="text-sm font-medium text-ink truncate">{name || 'Usuário'}</p>
+              <p className="text-xs text-ink-muted uppercase tracking-wide">{plan}</p>
             </div>
             <button
               onClick={handleLogout}
-              className="p-2 rounded-md text-slate-500 hover:bg-slate-100 hover:text-slate-700"
+              className="p-2 rounded-sm text-ink-muted hover:bg-surface-secondary hover:text-ink-secondary transition-colors duration-200"
               aria-label="Sair"
             >
-              <LogOut className="h-4 w-4" />
+              <LogOut className="h-4 w-4" strokeWidth={1.75} />
             </button>
           </div>
         </div>

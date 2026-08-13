@@ -1,10 +1,11 @@
 import { Card } from '@/components/ui/Card';
 import { CalorieWidget } from '@/components/CalorieWidget';
 import { HydrationWidget } from '@/components/HydrationWidget';
-import { createClient } from '@/lib/supabase/server';
+import { createClient, getCachedUser } from '@/lib/supabase/server';
 import { formatDate } from '@/lib/utils';
 import { Camera, ClipboardList, Lock, MessageCircle, Sparkles, Utensils } from 'lucide-react';
 import Link from 'next/link';
+import { redirect } from 'next/navigation';
 import type { MealPlan, MealPlanContent, NutritionQuestionnaire } from '@/types/database';
 
 // Garante dados sempre frescos (sem cache do Next.js)
@@ -19,7 +20,20 @@ const goalLabels = {
 
 export default async function DashboardPage() {
   const supabase = createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  // getCachedUser() é memoizada por requisição (react cache()) — como
+  // (app)/layout.tsx já chamou a mesma função pra esta requisição, isso
+  // reaproveita o resultado em vez de fazer uma segunda chamada de rede
+  // pra API de Auth do Supabase (CONFIRMADO: cada página estava
+  // chamando getUser() de novo por conta própria, dobrando o tráfego
+  // de auth e ajudando a estourar o rate limit do projeto).
+  const user = await getCachedUser();
+
+  // (app)/layout.tsx já faz esse mesmo redirect antes de renderizar
+  // esta página — mas se a checagem de auth aqui falhar por qualquer
+  // motivo (ex: rate limit da API do Supabase), `user` pode vir null
+  // mesmo assim. Sem essa guarda, os `user!.id` abaixo quebravam a
+  // página com TypeError em vez de simplesmente redirecionar de novo.
+  if (!user) redirect('/login');
 
   const [{ data: questionnaire }, { data: mealPlan }, { data: profile }, { data: subscription }] = await Promise.all([
     supabase
@@ -63,34 +77,34 @@ export default async function DashboardPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-bold">Olá, {profile?.name?.split(' ')[0] || 'bem-vindo'}!</h1>
-        <p className="text-slate-500">Aqui está um resumo da sua jornada nutricional.</p>
+        <h1 className="font-display text-3xl text-ink">Olá, {profile?.name?.split(' ')[0] || 'bem-vindo'}!</h1>
+        <p className="text-ink-muted mt-1">Aqui está um resumo da sua jornada nutricional.</p>
       </div>
 
       {/* Cards de resumo */}
       <div className="grid md:grid-cols-3 gap-4">
         {/* Plano com badge visual */}
         <Card>
-          <p className="text-xs text-slate-500 uppercase">Plano</p>
-          <div className="flex items-center gap-2 mt-1">
+          <p className="text-xs text-ink-muted uppercase tracking-wide">Plano</p>
+          <div className="flex items-center gap-2 mt-1.5">
             {isPro ? (
               <Link href="/pricing" className="group flex items-center gap-2">
-                <span className="text-2xl font-bold text-brand-600">PRO</span>
-                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-brand-100 text-brand-700 text-xs font-semibold group-hover:bg-brand-200 transition-colors">
+                <span className="font-display text-2xl text-primary-600">PRO</span>
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-primary-100 text-primary-700 text-xs font-semibold group-hover:bg-primary-200 transition-colors duration-200">
                   <Sparkles className="h-3 w-3" /> Ativo
                 </span>
               </Link>
             ) : (
               <>
-                <span className="text-2xl font-bold text-slate-700">FREE</span>
-                <Link href="/pricing" className="text-xs text-brand-600 font-medium hover:underline">
+                <span className="font-display text-2xl text-ink-secondary">FREE</span>
+                <Link href="/pricing" className="text-xs text-primary-600 font-medium hover:underline">
                   Fazer upgrade →
                 </Link>
               </>
             )}
           </div>
           {isPro && (
-            <p className="text-xs text-slate-500 mt-1">
+            <p className="text-xs text-ink-muted mt-1.5">
               {isRecurring
                 ? 'Renovação automática via cartão'
                 : daysLeft !== null
@@ -103,15 +117,15 @@ export default async function DashboardPage() {
         </Card>
 
         <Card>
-          <p className="text-xs text-slate-500 uppercase">Objetivo</p>
-          <p className="text-lg font-semibold mt-1">
+          <p className="text-xs text-ink-muted uppercase tracking-wide">Objetivo</p>
+          <p className="text-lg font-semibold text-ink mt-1.5">
             {questionnaire ? goalLabels[questionnaire.goal] : '—'}
           </p>
         </Card>
 
         <Card>
-          <p className="text-xs text-slate-500 uppercase">Último plano</p>
-          <p className="text-lg font-semibold mt-1">
+          <p className="text-xs text-ink-muted uppercase tracking-wide">Último plano</p>
+          <p className="text-lg font-semibold text-ink mt-1.5">
             {mealPlan ? formatDate(mealPlan.created_at) : 'Ainda não gerado'}
           </p>
         </Card>
@@ -120,8 +134,8 @@ export default async function DashboardPage() {
       {/* Plano alimentar atual */}
       <Card>
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-xl font-semibold">Seu plano alimentar atual</h2>
-          <Link href="/meal-plan" className="text-sm text-brand-600 font-medium hover:underline">
+          <h2 className="font-display text-xl text-ink">Seu plano alimentar atual</h2>
+          <Link href="/meal-plan" className="text-sm text-primary-600 font-medium hover:underline">
             Ver completo
           </Link>
         </div>
@@ -142,8 +156,8 @@ export default async function DashboardPage() {
           />
         ) : (
           <div className="space-y-2">
-            <p className="text-slate-700">{content?.summary}</p>
-            <p className="text-sm text-slate-500">
+            <p className="text-ink-secondary">{content?.summary}</p>
+            <p className="text-sm text-ink-muted">
               {content?.total_calories} kcal sugeridas · {content?.meals?.length} refeições
             </p>
           </div>
@@ -184,11 +198,11 @@ export default async function DashboardPage() {
 function EmptyState({ title, desc, href, cta }: { title: string; desc: string; href: string; cta: string }) {
   return (
     <div className="text-center py-8">
-      <h3 className="font-semibold text-lg mb-1">{title}</h3>
-      <p className="text-slate-500 mb-4">{desc}</p>
+      <h3 className="font-semibold text-ink text-lg mb-1.5">{title}</h3>
+      <p className="text-ink-muted mb-5">{desc}</p>
       <Link
         href={href}
-        className="inline-flex h-10 items-center rounded-lg bg-brand-600 text-white px-4 text-sm font-medium hover:bg-brand-700"
+        className="inline-flex h-10 items-center rounded-md bg-primary-500 text-white px-4 text-sm font-medium hover:bg-primary-600 transition-colors duration-200"
       >
         {cta}
       </Link>
@@ -207,14 +221,14 @@ function Shortcut({
   return (
     <Link
       href={href}
-      className="group relative rounded-xl border border-slate-200 bg-white p-4 flex flex-col items-start gap-3 hover:border-brand-400 hover:shadow-sm transition-all"
+      className="group relative rounded-md border border-border bg-surface p-4 flex flex-col items-start gap-3 hover:border-primary-300 transition-colors duration-200"
     >
-      <div className="h-9 w-9 rounded-lg bg-brand-50 text-brand-600 flex items-center justify-center group-hover:bg-brand-100">
-        <Icon className="h-4 w-4" />
+      <div className="h-9 w-9 rounded-sm bg-primary-50 text-primary-600 flex items-center justify-center group-hover:bg-primary-100 transition-colors duration-200">
+        <Icon className="h-4 w-4" strokeWidth={1.75} />
       </div>
-      <span className="text-sm font-medium text-slate-700">{label}</span>
+      <span className="text-sm font-medium text-ink-secondary">{label}</span>
       {locked && (
-        <span className="absolute top-2 right-2 flex items-center gap-1 px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 text-[10px] font-semibold">
+        <span className="absolute top-2 right-2 flex items-center gap-1 px-1.5 py-0.5 rounded-sm bg-warning/15 text-warning text-[10px] font-semibold">
           <Lock className="h-2.5 w-2.5" /> PRO
         </span>
       )}

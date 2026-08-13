@@ -87,18 +87,18 @@ export default function ChatPage() {
     return (
       <div className="space-y-4">
         <div>
-          <h1 className="text-2xl font-bold">Chat com IA</h1>
-          <p className="text-sm text-slate-500">Tire dúvidas, peça substituições ou ajustes no seu plano.</p>
+          <h1 className="font-display text-2xl text-ink">Chat com IA</h1>
+          <p className="text-sm text-ink-muted">Tire dúvidas, peça substituições ou ajustes no seu plano.</p>
         </div>
         <Card className="text-center py-12 space-y-4">
           <div className="flex justify-center">
-            <div className="h-16 w-16 rounded-full bg-amber-100 text-amber-600 flex items-center justify-center">
-              <Lock className="h-8 w-8" />
+            <div className="h-16 w-16 rounded-full bg-warning/15 text-warning flex items-center justify-center">
+              <Lock className="h-8 w-8" strokeWidth={1.5} />
             </div>
           </div>
           <div>
-            <h2 className="text-xl font-bold">Recurso exclusivo PRO</h2>
-            <p className="text-slate-500 mt-1 max-w-sm mx-auto">
+            <h2 className="font-display text-xl text-ink">Recurso exclusivo PRO</h2>
+            <p className="text-ink-muted mt-1 max-w-sm mx-auto">
               O chat com IA está disponível apenas no plano PRO. Faça upgrade para conversar
               com a IA sobre seu plano alimentar.
             </p>
@@ -118,7 +118,7 @@ export default function ChatPage() {
     <div className="space-y-4">
       <div>
         <h1 className="text-2xl font-bold">Chat com IA</h1>
-        <p className="text-sm text-slate-500">
+        <p className="text-sm text-ink-muted">
           Tire dúvidas, peça substituições ou ajustes no seu plano sugerido.
         </p>
       </div>
@@ -126,7 +126,7 @@ export default function ChatPage() {
       <Card className="p-0 overflow-hidden flex flex-col h-[65vh]">
         <div ref={scrollRef} className="flex-1 overflow-y-auto p-6 space-y-4">
           {messages.length === 0 && (
-            <div className="text-center text-slate-400 text-sm py-16">
+            <div className="text-center text-ink-muted text-sm py-16">
               Envie sua primeira mensagem
             </div>
           )}
@@ -136,8 +136,8 @@ export default function ChatPage() {
               className={cn(
                 'max-w-[80%] rounded-2xl px-4 py-2.5 text-sm animate-fade-in',
                 m.role === 'user'
-                  ? 'ml-auto bg-brand-600 text-white rounded-br-sm'
-                  : 'bg-slate-100 text-slate-800 rounded-bl-sm',
+                  ? 'ml-auto bg-primary-600 text-white rounded-br-sm'
+                  : 'bg-surface-secondary text-ink rounded-bl-sm',
               )}
             >
               {m.role === 'ai' ? (
@@ -148,22 +148,22 @@ export default function ChatPage() {
             </div>
           ))}
           {send.isPending && (
-            <div className="bg-slate-100 rounded-2xl rounded-bl-sm px-4 py-2.5 w-fit">
+            <div className="bg-surface-secondary rounded-2xl rounded-bl-sm px-4 py-2.5 w-fit">
               <div className="flex gap-1">
-                <span className="h-2 w-2 bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-                <span className="h-2 w-2 bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-                <span className="h-2 w-2 bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                <span className="h-2 w-2 bg-ink-muted rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                <span className="h-2 w-2 bg-ink-muted rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                <span className="h-2 w-2 bg-ink-muted rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
               </div>
             </div>
           )}
         </div>
 
-        <form onSubmit={handleSubmit} className="border-t border-slate-200 p-4 flex gap-2">
+        <form onSubmit={handleSubmit} className="border-t border-border p-4 flex gap-2">
           <input
             value={input}
             onChange={(e) => setInput(e.target.value)}
             placeholder="Pergunte algo sobre seu plano..."
-            className="flex-1 h-10 px-3 rounded-lg border border-slate-300 text-sm focus:ring-2 focus:ring-brand-500 focus:outline-none"
+            className="flex-1 h-10 px-3 rounded-sm border border-border text-sm focus:ring-2 focus:ring-primary-500 focus:outline-none"
             disabled={send.isPending}
           />
           <Button type="submit" disabled={!input.trim() || send.isPending}>

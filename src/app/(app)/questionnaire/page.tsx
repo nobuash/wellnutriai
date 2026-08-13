@@ -47,12 +47,12 @@ function TagsInput({ value, onChange, placeholder }: {
     <div>
       <div className="flex flex-wrap gap-2 mb-2">
         {value.map((tag) => (
-          <span key={tag} className="inline-flex items-center gap-1 rounded-full bg-brand-50 text-brand-700 px-3 py-1 text-xs">
+          <span key={tag} className="inline-flex items-center gap-1 rounded-full bg-primary-50 text-primary-700 px-3 py-1 text-xs">
             {tag}
             <button
               type="button"
               onClick={() => onChange(value.filter((t) => t !== tag))}
-              className="hover:text-brand-900"
+              className="hover:text-primary-900"
               aria-label="remover"
             >×</button>
           </span>
@@ -61,7 +61,7 @@ function TagsInput({ value, onChange, placeholder }: {
       <input
         type="text"
         placeholder={placeholder}
-        className="w-full h-10 px-3 rounded-lg border border-slate-300 text-sm focus:ring-2 focus:ring-brand-500 focus:outline-none"
+        className="w-full h-10 px-3 rounded-sm border border-border text-sm focus:ring-2 focus:ring-primary-500 focus:outline-none"
         onKeyDown={(e) => {
           if (e.key === 'Enter' && e.currentTarget.value.trim()) {
             e.preventDefault();
@@ -71,7 +71,7 @@ function TagsInput({ value, onChange, placeholder }: {
           }
         }}
       />
-      <p className="text-xs text-slate-500 mt-1">Digite e pressione Enter</p>
+      <p className="text-xs text-ink-muted mt-1">Digite e pressione Enter</p>
     </div>
   );
 }
@@ -109,9 +109,9 @@ export default function QuestionnairePage() {
   }
 
   return (
-    <Card className="max-w-3xl">
-      <h1 className="text-2xl font-bold mb-1">Questionário nutricional</h1>
-      <p className="text-sm text-slate-500 mb-6">
+    <Card className="max-w-3xl p-8">
+      <h1 className="font-display text-2xl text-ink mb-1.5">Questionário nutricional</h1>
+      <p className="text-sm text-ink-muted mb-6">
         Seus dados ficam privados e são usados apenas para gerar seu plano sugerido por IA.
       </p>
 
@@ -128,63 +128,63 @@ export default function QuestionnairePage() {
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-slate-700 mb-2">Objetivo</label>
+          <label className="block text-sm font-medium text-ink-secondary mb-2">Objetivo</label>
           <div className="grid grid-cols-3 gap-2">
             {GOALS.map((g) => (
               <label key={g.value} className="cursor-pointer">
                 <input type="radio" value={g.value} {...register('goal')} className="peer sr-only" />
-                <div className="rounded-lg border border-slate-300 p-3 text-center text-sm peer-checked:border-brand-600 peer-checked:bg-brand-50 peer-checked:text-brand-700 peer-checked:font-medium">
+                <div className="rounded-sm border border-border p-3 text-center text-sm peer-checked:border-primary-600 peer-checked:bg-primary-50 peer-checked:text-primary-700 peer-checked:font-medium">
                   {g.label}
                 </div>
               </label>
             ))}
           </div>
-          {errors.goal && <p className="text-xs text-red-600 mt-1">Selecione um objetivo</p>}
+          {errors.goal && <p className="text-xs text-error mt-1">Selecione um objetivo</p>}
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-slate-700 mb-2">Nível de atividade</label>
+          <label className="block text-sm font-medium text-ink-secondary mb-2">Nível de atividade</label>
           <div className="grid grid-cols-5 gap-2">
             {ACTIVITY.map((a) => (
               <label key={a.value} className="cursor-pointer">
                 <input type="radio" value={a.value} {...register('activity_level')} className="peer sr-only" />
-                <div className="rounded-lg border border-slate-300 p-2 text-center text-xs peer-checked:border-brand-600 peer-checked:bg-brand-50 peer-checked:text-brand-700 peer-checked:font-medium">
+                <div className="rounded-sm border border-border p-2 text-center text-xs peer-checked:border-primary-600 peer-checked:bg-primary-50 peer-checked:text-primary-700 peer-checked:font-medium">
                   {a.label}
                 </div>
               </label>
             ))}
           </div>
-          {errors.activity_level && <p className="text-xs text-red-600 mt-1">Selecione um nível</p>}
+          {errors.activity_level && <p className="text-xs text-error mt-1">Selecione um nível</p>}
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-slate-700 mb-2">Você tem diabetes?</label>
+          <label className="block text-sm font-medium text-ink-secondary mb-2">Você tem diabetes?</label>
           <div className="grid grid-cols-2 gap-2">
             {DIABETES_OPTIONS.map((d) => (
               <label key={d.value} className="cursor-pointer">
                 <input type="radio" value={d.value} {...register('diabetes_type')} className="peer sr-only" />
-                <div className="rounded-lg border border-slate-300 p-3 text-sm peer-checked:border-brand-600 peer-checked:bg-brand-50 peer-checked:text-brand-700 peer-checked:font-medium">
+                <div className="rounded-sm border border-border p-3 text-sm peer-checked:border-primary-600 peer-checked:bg-primary-50 peer-checked:text-primary-700 peer-checked:font-medium">
                   <span className="font-medium">{d.label}</span>
-                  {d.description && <p className="text-xs text-slate-400 mt-0.5">{d.description}</p>}
+                  {d.description && <p className="text-xs text-ink-muted mt-0.5">{d.description}</p>}
                 </div>
               </label>
             ))}
           </div>
-          {errors.diabetes_type && <p className="text-xs text-red-600 mt-1">Selecione uma opção</p>}
+          {errors.diabetes_type && <p className="text-xs text-error mt-1">Selecione uma opção</p>}
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-slate-700 mb-2">
+          <label className="block text-sm font-medium text-ink-secondary mb-2">
             Alguma dessas condições se aplica a você?
           </label>
-          <p className="text-xs text-slate-500 mb-2">
+          <p className="text-xs text-ink-muted mb-2">
             Isso nos ajuda a saber quando não é seguro gerar um plano automatizado — nesses casos,
             recomendamos acompanhamento profissional em vez de uma sugestão genérica de IA.
           </p>
           <div className="grid md:grid-cols-2 gap-2">
             {MEDICAL_CHECKBOXES.map((c) => (
-              <label key={c.name} className="flex items-center gap-2 rounded-lg border border-slate-200 p-3 text-sm cursor-pointer hover:bg-slate-50">
-                <input type="checkbox" {...register(c.name)} className="h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500" />
+              <label key={c.name} className="flex items-center gap-2 rounded-sm border border-border p-3 text-sm cursor-pointer hover:bg-surface-secondary">
+                <input type="checkbox" {...register(c.name)} className="h-4 w-4 rounded border-border text-primary-600 focus:ring-primary-500" />
                 {c.label}
               </label>
             ))}
@@ -192,19 +192,19 @@ export default function QuestionnairePage() {
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-slate-700 mb-2">
+          <label className="block text-sm font-medium text-ink-secondary mb-2">
             Outra condição médica relevante (opcional)
           </label>
           <input
             type="text"
             {...register('other_medical_condition')}
             placeholder="ex: hipotireoidismo, pós-cirurgia bariátrica..."
-            className="w-full h-10 px-3 rounded-lg border border-slate-300 text-sm focus:ring-2 focus:ring-brand-500 focus:outline-none"
+            className="w-full h-10 px-3 rounded-sm border border-border text-sm focus:ring-2 focus:ring-primary-500 focus:outline-none"
           />
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-slate-700 mb-2">Alergias</label>
+          <label className="block text-sm font-medium text-ink-secondary mb-2">Alergias</label>
           <Controller
             name="allergies"
             control={control}
@@ -215,7 +215,7 @@ export default function QuestionnairePage() {
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-slate-700 mb-2">Preferências alimentares</label>
+          <label className="block text-sm font-medium text-ink-secondary mb-2">Preferências alimentares</label>
           <Controller
             name="dietary_preferences"
             control={control}
@@ -226,7 +226,7 @@ export default function QuestionnairePage() {
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-slate-700 mb-2">Alimentos que você não gosta</label>
+          <label className="block text-sm font-medium text-ink-secondary mb-2">Alimentos que você não gosta</label>
           <Controller
             name="disliked_foods"
             control={control}
@@ -237,12 +237,12 @@ export default function QuestionnairePage() {
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-slate-700 mb-2">Rotina (opcional)</label>
+          <label className="block text-sm font-medium text-ink-secondary mb-2">Rotina (opcional)</label>
           <textarea
             {...register('routine')}
             rows={3}
             placeholder="Conte um pouco sobre sua rotina diária e horários"
-            className="w-full px-3 py-2 rounded-lg border border-slate-300 text-sm focus:ring-2 focus:ring-brand-500 focus:outline-none"
+            className="w-full px-3 py-2 rounded-sm border border-border text-sm focus:ring-2 focus:ring-primary-500 focus:outline-none"
           />
         </div>
 

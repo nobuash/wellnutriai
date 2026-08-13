@@ -69,7 +69,7 @@ export default function PrivacyPage() {
 
       <h2>5. Retenção de dados</h2>
       <p>
-        Ver a <a href="/data-retention" className="text-brand-600 underline">Política de Retenção de Dados</a>{' '}
+        Ver a <a href="/data-retention" className="text-primary-600 underline">Política de Retenção de Dados</a>{' '}
         para prazos específicos por tipo de dado.
       </p>
 

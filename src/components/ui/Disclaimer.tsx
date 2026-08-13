@@ -11,10 +11,10 @@ export function Disclaimer({ variant = 'info', className, children }: Props) {
   return (
     <div
       className={cn(
-        'flex gap-3 rounded-lg border p-4 text-sm',
+        'flex gap-3 rounded-md border p-4 text-sm',
         variant === 'warning'
-          ? 'border-amber-200 bg-amber-50 text-amber-900'
-          : 'border-blue-200 bg-blue-50 text-blue-900',
+          ? 'border-warning/30 bg-warning/10 text-warning'
+          : 'border-info/30 bg-info/10 text-info',
         className
       )}
     >

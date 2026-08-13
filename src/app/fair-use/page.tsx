@@ -53,7 +53,7 @@ export default function FairUsePage() {
       <p>
         Todo conteúdo gerado por IA na Plataforma é uma sugestão
         automatizada, não uma prescrição ou orientação profissional — ver
-        os <a href="/terms" className="text-brand-600 underline">Termos de Uso</a>.
+        os <a href="/terms" className="text-primary-600 underline">Termos de Uso</a>.
       </p>
     </LegalPageLayout>
   );

@@ -3,7 +3,7 @@ import { Disclaimer } from '@/components/ui/Disclaimer';
 import { MobileInstallPrompt } from '@/components/MobileInstallPrompt';
 import { PRIVACY_VERSION, TERMS_VERSION } from '@/lib/consent';
 import { evaluateConsent } from '@/lib/consentCheck';
-import { createClient } from '@/lib/supabase/server';
+import { createClient, getCachedUser } from '@/lib/supabase/server';
 import { headers } from 'next/headers';
 import { redirect } from 'next/navigation';
 
@@ -19,8 +19,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
   let user = null;
   try {
-    const { data } = await supabase.auth.getUser();
-    user = data.user;
+    user = await getCachedUser();
   } catch {
     redirect('/login');
   }

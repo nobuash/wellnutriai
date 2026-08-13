@@ -18,7 +18,7 @@ export const Input = forwardRef<HTMLInputElement, Props>(
     return (
       <div className="w-full space-y-1.5">
         {label && (
-          <label htmlFor={inputId} className="block text-sm font-medium text-slate-700">
+          <label htmlFor={inputId} className="block text-sm font-medium text-ink-secondary">
             {label}
           </label>
         )}
@@ -28,9 +28,9 @@ export const Input = forwardRef<HTMLInputElement, Props>(
             id={inputId}
             type={isPassword && showPassword ? 'text' : type}
             className={cn(
-              'w-full h-10 rounded-lg border bg-white text-sm text-slate-900 placeholder:text-slate-400',
-              'focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500',
-              error ? 'border-red-400' : 'border-slate-300',
+              'w-full h-10 rounded-sm border bg-surface text-sm text-ink placeholder:text-ink-muted transition-colors duration-200',
+              'focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500',
+              error ? 'border-error' : 'border-border',
               isPassword ? 'px-3 pr-10' : 'px-3',
               className
             )}
@@ -41,13 +41,13 @@ export const Input = forwardRef<HTMLInputElement, Props>(
               type="button"
               tabIndex={-1}
               onClick={() => setShowPassword((v) => !v)}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-ink-muted hover:text-ink-secondary"
             >
               {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
             </button>
           )}
         </div>
-        {error && <p className="text-xs text-red-600">{error}</p>}
+        {error && <p className="text-xs text-error">{error}</p>}
       </div>
     );
   }
