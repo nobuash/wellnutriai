@@ -28,6 +28,12 @@ export async function POST(req: Request) {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: 'Não autenticado' }, { status: 401 });
 
+  // Conta do Mercado Pago pode não estar habilitada pra receber
+  // pagamentos ainda — mesma checagem de src/app/api/payment/pix/route.ts.
+  if (!process.env.MP_ACCESS_TOKEN) {
+    return NextResponse.json({ error: 'Pagamento via cartão (Mercado Pago) indisponível no momento.' }, { status: 503 });
+  }
+
   // Rate limit distribuído: 10 tentativas de cobrança por hora por usuário
   if (!(await checkDistributedRateLimit(`payment-card:${user.id}`, 10, 3600))) {
     return NextResponse.json({ error: 'Muitas tentativas. Tente novamente em breve.' }, { status: 429 });

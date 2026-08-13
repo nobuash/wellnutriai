@@ -19,6 +19,19 @@ jobs:
       SUPABASE_SERVICE_ROLE_KEY: ci-placeholder-service-role-key
       OPENAI_API_KEY: sk-ci-placeholder
       NEXT_PUBLIC_APP_URL: http://localhost:3000
+      # CONFIRMADO em produção: NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY ficou
+      # ausente na Vercel sem o build nunca acusar nada — next.config.js
+      # passou a validar essas variáveis também (ver next.config.js), então
+      # o CI precisa dos mesmos placeholders fictícios pra não travar aqui.
+      STRIPE_SECRET_KEY: sk_test_ci-placeholder
+      NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: pk_test_ci-placeholder
+      STRIPE_WEBHOOK_SECRET: whsec_ci-placeholder
+      STRIPE_PRICE_MONTHLY: price_ci-placeholder-monthly
+      STRIPE_PRICE_QUARTERLY: price_ci-placeholder-quarterly
+      STRIPE_PRICE_ANNUAL: price_ci-placeholder-annual
+      MP_ACCESS_TOKEN: TEST-ci-placeholder
+      MP_WEBHOOK_SECRET: ci-placeholder-mp-webhook-secret
+      NEXT_PUBLIC_MP_PUBLIC_KEY: TEST-ci-placeholder-public-key
     steps:
       - uses: actions/checkout@v4
 
