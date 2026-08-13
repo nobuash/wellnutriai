@@ -1,6 +1,12 @@
+import type { Metadata } from 'next';
 import { LegalPageLayout } from '@/components/LegalPageLayout';
 
-export const metadata = { title: 'Política de Retenção de Dados — WellNutriAI' };
+export const metadata: Metadata = {
+  title: 'Política de Retenção de Dados — WellNutriAI',
+  description:
+    'Por quanto tempo o WellNutriAI mantém os dados da sua conta e o que acontece quando você a exclui.',
+  alternates: { canonical: '/data-retention' },
+};
 
 // Reflete o comportamento real implementado no código (ver
 // src/app/api/account/delete/route.ts e docs/data-retention.md) — ajuste

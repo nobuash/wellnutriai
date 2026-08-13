@@ -7,9 +7,12 @@ import { Camera, ClipboardList, Lock, MessageCircle, Sparkles, Utensils } from '
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import type { MealPlan, MealPlanContent, NutritionQuestionnaire } from '@/types/database';
+import { privateMetadata } from '@/lib/seo';
 
 // Garante dados sempre frescos (sem cache do Next.js)
 export const dynamic = 'force-dynamic';
+
+export const metadata = privateMetadata('Painel — WellNutriAI');
 
 const goalLabels = {
   gain_muscle: 'Ganho de massa muscular',

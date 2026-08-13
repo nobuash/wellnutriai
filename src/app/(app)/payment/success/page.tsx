@@ -2,6 +2,9 @@ import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { CheckCircle2 } from 'lucide-react';
 import Link from 'next/link';
+import { privateMetadata } from '@/lib/seo';
+
+export const metadata = privateMetadata('Pagamento aprovado — WellNutriAI');
 
 export default function PaymentSuccessPage() {
   return (

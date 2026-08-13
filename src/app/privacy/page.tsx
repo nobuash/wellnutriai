@@ -1,6 +1,12 @@
+import type { Metadata } from 'next';
 import { LegalPageLayout } from '@/components/LegalPageLayout';
 
-export const metadata = { title: 'Política de Privacidade — WellNutriAI' };
+export const metadata: Metadata = {
+  title: 'Política de Privacidade — WellNutriAI',
+  description:
+    'Como o WellNutriAI coleta, usa e protege os dados pessoais dos usuários da plataforma, em conformidade com a LGPD.',
+  alternates: { canonical: '/privacy' },
+};
 
 // [PLACEHOLDER PARA O MANTENEDOR]: rascunho estrutural com base no que
 // o código efetivamente coleta e processa hoje — não é um documento

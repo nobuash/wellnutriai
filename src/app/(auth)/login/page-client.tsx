@@ -1,0 +1,79 @@
+'use client';
+
+import { Button } from '@/components/ui/Button';
+import { Card } from '@/components/ui/Card';
+import { Input } from '@/components/ui/Input';
+import { createClient } from '@/lib/supabase/client';
+import { loginSchema, type LoginInput } from '@/lib/validation';
+import { zodResolver } from '@hookform/resolvers/zod';
+import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { useForm } from 'react-hook-form';
+import { toast } from 'sonner';
+
+export default function LoginPage() {
+  const router = useRouter();
+  const supabase = createClient();
+
+  const {
+    register,
+    handleSubmit,
+    formState: { errors, isSubmitting },
+  } = useForm<LoginInput>({ resolver: zodResolver(loginSchema) });
+
+  async function onSubmit(data: LoginInput) {
+    const { error } = await supabase.auth.signInWithPassword(data);
+    if (error) {
+      if (error.message.toLowerCase().includes('email not confirmed')) {
+        toast.error('Confirme seu e-mail antes de entrar. Verifique sua caixa de entrada.');
+      } else {
+        toast.error('E-mail ou senha incorretos');
+      }
+      return;
+    }
+    toast.success('Bem-vindo de volta!');
+    router.push('/dashboard');
+    router.refresh();
+  }
+
+  return (
+    <Card className="animate-slide-up p-8">
+      <h1 className="font-display text-2xl text-ink mb-1.5">Entrar</h1>
+      <p className="text-sm text-ink-muted mb-6">Acesse sua conta WellNutriAI</p>
+
+      <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+        <Input
+          label="E-mail"
+          type="email"
+          autoComplete="email"
+          {...register('email')}
+          error={errors.email?.message}
+        />
+        <div>
+          <Input
+            label="Senha"
+            type="password"
+            autoComplete="current-password"
+            {...register('password')}
+            error={errors.password?.message}
+          />
+          <div className="text-right mt-1">
+            <Link href="/forgot-password" className="text-sm text-primary-600 hover:underline">
+              Esqueci minha senha
+            </Link>
+          </div>
+        </div>
+        <Button type="submit" className="w-full" loading={isSubmitting}>
+          Entrar
+        </Button>
+      </form>
+
+      <p className="text-sm text-center text-ink-secondary mt-6">
+        Não tem conta?{' '}
+        <Link href="/signup" className="text-primary-600 font-medium hover:underline">
+          Criar conta
+        </Link>
+      </p>
+    </Card>
+  );
+}

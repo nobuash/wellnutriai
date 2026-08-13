@@ -1,0 +1,192 @@
+'use client';
+
+import { Button } from '@/components/ui/Button';
+import { Card } from '@/components/ui/Card';
+import { Disclaimer } from '@/components/ui/Disclaimer';
+import { createClient } from '@/lib/supabase/client';
+import { formatDate } from '@/lib/utils';
+import type { MealPlan, MealPlanContent } from '@/types/database';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { Droplets, HeartPulse, Sparkles } from 'lucide-react';
+import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { useState } from 'react';
+import { toast } from 'sonner';
+
+export default function MealPlanPage() {
+  const supabase = createClient();
+  const queryClient = useQueryClient();
+  const router = useRouter();
+  const [medicalBlock, setMedicalBlock] = useState<string | null>(null);
+
+  const { data: mealPlan, isLoading } = useQuery({
+    queryKey: ['meal-plan-latest'],
+    queryFn: async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return null;
+      const { data } = await supabase
+        .from('meal_plans')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      return data as MealPlan | null;
+    },
+  });
+
+  const generate = useMutation({
+    mutationFn: async () => {
+      const res = await fetch('/api/meal-plan', { method: 'POST' });
+      const data = await res.json();
+      if (!res.ok) {
+        if (data.medicalRestriction) {
+          setMedicalBlock(data.error);
+        } else if (data.upgrade) {
+          toast.error(data.error, {
+            action: { label: 'Upgrade', onClick: () => router.push('/pricing') },
+          });
+        } else {
+          toast.error(data.error || 'Erro ao gerar');
+        }
+        throw new Error(data.error);
+      }
+      return data.mealPlan as MealPlan;
+    },
+    onSuccess: () => {
+      setMedicalBlock(null);
+      toast.success('Plano gerado!');
+      queryClient.invalidateQueries({ queryKey: ['meal-plan-latest'] });
+    },
+  });
+
+  const content = mealPlan?.content as MealPlanContent | undefined;
+
+  if (isLoading) return <Card>Carregando...</Card>;
+
+  const medicalBlockCard = medicalBlock && (
+    <Card className="border-warning/30 bg-warning/10">
+      <div className="flex gap-3">
+        <HeartPulse className="h-5 w-5 text-warning shrink-0 mt-0.5" />
+        <div>
+          <h3 className="font-semibold text-warning mb-1">Não geramos um plano automático para essa condição</h3>
+          <p className="text-sm text-warning/90">{medicalBlock}</p>
+        </div>
+      </div>
+    </Card>
+  );
+
+  if (!mealPlan) {
+    return (
+      <div className="space-y-4">
+        {medicalBlockCard}
+        <Card className="text-center py-12">
+          <Sparkles className="h-10 w-10 text-primary-600 mx-auto mb-4" />
+          <h2 className="text-xl font-semibold mb-2">Gere seu primeiro plano</h2>
+          <p className="text-ink-muted mb-6 max-w-md mx-auto">
+            Com base nas informações do questionário, a IA vai sugerir um plano alimentar personalizado.
+          </p>
+          <div className="flex gap-2 justify-center">
+            <Link href="/questionnaire">
+              <Button variant="outline">Revisar questionário</Button>
+            </Link>
+            <Button loading={generate.isPending} onClick={() => generate.mutate()}>
+              Gerar plano sugerido
+            </Button>
+          </div>
+        </Card>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      {medicalBlockCard}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="font-display text-2xl text-ink">Plano alimentar sugerido</h1>
+          <p className="text-sm text-ink-muted">
+            Gerado em {formatDate(mealPlan.created_at)} · Sugestão de IA
+          </p>
+        </div>
+        <Button loading={generate.isPending} onClick={() => generate.mutate()}>
+          <Sparkles className="h-4 w-4" />
+          Gerar novo
+        </Button>
+      </div>
+
+      <Card>
+        <p className="text-ink-secondary mb-4">{content?.summary}</p>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-3">
+          <Stat label="Calorias" value={`${content?.total_calories ?? '—'} kcal`} />
+          <Stat label="Proteína" value={`${content?.macros?.protein_g ?? '—'}g`} />
+          <Stat label="Carboidratos" value={`${content?.macros?.carbs_g ?? '—'}g`} />
+          <Stat label="Gorduras" value={`${content?.macros?.fat_g ?? '—'}g`} />
+        </div>
+        {content?.daily_water_ml && (
+          <div className="flex items-center gap-2 mt-2 rounded-md bg-info/10 border border-info/20 px-4 py-3">
+            <Droplets className="h-5 w-5 text-info shrink-0" />
+            <div>
+              <p className="text-sm font-medium text-info">
+                Água diária recomendada: {content.daily_water_ml >= 1000
+                  ? `${(content.daily_water_ml / 1000).toFixed(1).replace('.', ',')} L`
+                  : `${content.daily_water_ml} ml`}
+              </p>
+              <p className="text-xs text-info/80">Distribua ao longo do dia, especialmente antes e durante exercícios.</p>
+            </div>
+          </div>
+        )}
+      </Card>
+
+      <div className="space-y-3">
+        {content?.meals?.map((meal, i) => (
+          <Card key={i}>
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="font-semibold">{meal.name}</h3>
+              <span className="text-sm text-ink-muted">{meal.time}</span>
+            </div>
+            <ul className="space-y-1 mb-3">
+              {meal.foods.map((f, j) => (
+                <li key={j} className="flex justify-between text-sm">
+                  <span className="text-ink-secondary">{f.item}</span>
+                  <span className="text-ink-muted">{f.quantity}</span>
+                </li>
+              ))}
+            </ul>
+            <div className="flex gap-4 text-xs text-ink-muted pt-3 border-t border-divider">
+              <span>{meal.calories} kcal</span>
+              <span>P: {meal.macros.protein_g}g</span>
+              <span>C: {meal.macros.carbs_g}g</span>
+              <span>G: {meal.macros.fat_g}g</span>
+            </div>
+          </Card>
+        ))}
+      </div>
+
+      {content?.observations && content.observations.length > 0 && (
+        <Card>
+          <h3 className="font-semibold mb-3">Observações</h3>
+          <ul className="space-y-2 text-sm text-ink-secondary list-disc pl-5">
+            {content.observations.map((obs, i) => (
+              <li key={i}>{obs}</li>
+            ))}
+          </ul>
+        </Card>
+      )}
+
+      <Disclaimer variant="warning">
+        {content?.disclaimer ||
+          'Este é um plano alimentar sugerido por IA. Não substitui nutricionista ou profissional de saúde.'}
+      </Disclaimer>
+    </div>
+  );
+}
+
+function Stat({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-sm bg-surface-secondary p-3">
+      <p className="text-xs text-ink-muted uppercase tracking-wide">{label}</p>
+      <p className="font-semibold text-ink mt-1">{value}</p>
+    </div>
+  );
+}

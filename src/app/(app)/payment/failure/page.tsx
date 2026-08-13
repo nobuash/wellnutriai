@@ -2,6 +2,9 @@ import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { XCircle } from 'lucide-react';
 import Link from 'next/link';
+import { privateMetadata } from '@/lib/seo';
+
+export const metadata = privateMetadata('Pagamento não aprovado — WellNutriAI');
 
 export default function PaymentFailurePage() {
   return (
