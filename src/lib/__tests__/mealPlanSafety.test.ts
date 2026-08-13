@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { findForbiddenFoods, isHighRiskCondition } from '@/lib/mealPlanSafety';
+import { findForbiddenFoods, getNutritionSafetyMode, isHighRiskCondition } from '@/lib/mealPlanSafety';
 import type { MealPlanContent } from '@/types/database';
 
 describe('isHighRiskCondition', () => {
@@ -30,6 +30,36 @@ describe('isHighRiskCondition', () => {
     expect(isHighRiskCondition({ other_medical_condition: 'hipotireoidismo' })).toBe(true);
     expect(isHighRiskCondition({ other_medical_condition: '   ' })).toBe(false);
     expect(isHighRiskCondition({ other_medical_condition: null })).toBe(false);
+  });
+});
+
+describe('getNutritionSafetyMode', () => {
+  it('retorna standard quando não há questionário (usuário ainda não respondeu)', () => {
+    expect(getNutritionSafetyMode(null)).toBe('standard');
+  });
+
+  it('retorna standard para um questionário sem condição de risco', () => {
+    expect(getNutritionSafetyMode({ diabetes_type: 'none' })).toBe('standard');
+  });
+
+  it('retorna restricted para qualquer condição que isHighRiskCondition já bloqueia', () => {
+    expect(getNutritionSafetyMode({ diabetes_type: 'type2' })).toBe('restricted');
+    expect(getNutritionSafetyMode({ is_pregnant: true })).toBe('restricted');
+    expect(getNutritionSafetyMode({ has_severe_allergy: true })).toBe('restricted');
+    expect(getNutritionSafetyMode({ other_medical_condition: 'hipotireoidismo' })).toBe('restricted');
+  });
+
+  it('nunca diverge de isHighRiskCondition — é só a mesma decisão com um nome mais expressivo', () => {
+    const cases: Array<Parameters<typeof isHighRiskCondition>[0]> = [
+      { diabetes_type: 'none' },
+      { diabetes_type: 'pre_diabetes' },
+      { uses_insulin: true },
+      { has_eating_disorder_history: true },
+    ];
+    for (const q of cases) {
+      const expected = isHighRiskCondition(q) ? 'restricted' : 'standard';
+      expect(getNutritionSafetyMode(q)).toBe(expected);
+    }
   });
 });
 

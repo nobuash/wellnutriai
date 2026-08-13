@@ -1,5 +1,12 @@
 import type { Metadata } from 'next';
 import { LegalPageLayout } from '@/components/LegalPageLayout';
+import {
+  LEGAL_DOCS_UPDATED_AT,
+  LEGAL_ENTITY_ADDRESS,
+  LEGAL_ENTITY_CNPJ,
+  LEGAL_ENTITY_NAME,
+  SUPPORT_CONTACT_EMAIL,
+} from '@/config/legal';
 
 export const metadata: Metadata = {
   title: 'Termos de Uso — WellNutriAI',
@@ -13,13 +20,13 @@ export const metadata: Metadata = {
 // LGPD e direito do consumidor) antes de publicar em produção.
 export default function TermsPage() {
   return (
-    <LegalPageLayout title="Termos de Uso" updatedAt="[PLACEHOLDER: data de publicação]">
+    <LegalPageLayout title="Termos de Uso" updatedAt={LEGAL_DOCS_UPDATED_AT ?? '[PLACEHOLDER: data de publicação]'}>
       <p>
         Estes Termos de Uso regulam o acesso e uso da plataforma WellNutriAI
         (&quot;Plataforma&quot;), operada por{' '}
-        <strong>[PLACEHOLDER: razão social]</strong>, inscrita no CNPJ sob o
-        nº <strong>[PLACEHOLDER: CNPJ]</strong>, com sede em{' '}
-        <strong>[PLACEHOLDER: endereço]</strong> (&quot;WellNutriAI&quot;,
+        <strong>{LEGAL_ENTITY_NAME ?? '[PLACEHOLDER: razão social]'}</strong>, inscrita no CNPJ sob o
+        nº <strong>{LEGAL_ENTITY_CNPJ ?? '[PLACEHOLDER: CNPJ]'}</strong>, com sede em{' '}
+        <strong>{LEGAL_ENTITY_ADDRESS ?? '[PLACEHOLDER: endereço]'}</strong> (&quot;WellNutriAI&quot;,
         &quot;nós&quot;).
       </p>
 
@@ -100,7 +107,7 @@ export default function TermsPage() {
 
       <h2>9. Contato</h2>
       <p>
-        Dúvidas sobre estes Termos: <strong>[PLACEHOLDER: e-mail de contato/suporte]</strong>.
+        Dúvidas sobre estes Termos: <strong>{SUPPORT_CONTACT_EMAIL ?? '[PLACEHOLDER: e-mail de contato/suporte]'}</strong>.
       </p>
     </LegalPageLayout>
   );

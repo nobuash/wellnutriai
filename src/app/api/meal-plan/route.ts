@@ -1,16 +1,20 @@
 import { MODELS, openai } from '@/lib/openai/client';
 import { formatKnowledgeContext, searchKnowledge } from '@/lib/knowledge/search';
 import { buildMealPlanPrompt, LEGAL_DISCLAIMER } from '@/lib/openai/prompts';
+import { calculateEnergyTargets, type EnergyResult } from '@/lib/nutrition/energy';
+import { validateMealPlanMath } from '@/lib/nutrition/mealPlanMath';
 import { featureLimitReason, PLAN_LIMITS } from '@/lib/plans';
 import { getUserEntitlement } from '@/lib/entitlement';
 import { checkDailyAiBudget, checkUserMonthlyBudget, consumeUsageQuota, logAiUsage, monthKey } from '@/lib/aiUsage';
 import {
   findForbiddenFoods,
-  isHighRiskCondition,
+  getNutritionSafetyMode,
   MEDICAL_RESTRICTION_MESSAGE,
   mealPlanContentSchema,
 } from '@/lib/mealPlanSafety';
 import { requireCurrentConsent, consentReasonMessage } from '@/lib/consentCheck';
+import { healthDataConsentReasonMessage, requireHealthDataConsent } from '@/lib/healthDataConsent';
+import { isRegulatoryReviewApproved, REGULATORY_HOLD_MESSAGE } from '@/lib/regulatory';
 import { checkDistributedRateLimit } from '@/lib/distributedRateLimit';
 import { rateLimit } from '@/lib/ratelimit';
 import { createClient } from '@/lib/supabase/server';
@@ -27,6 +31,10 @@ export async function POST() {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: 'Não autenticado' }, { status: 401 });
 
+  if (!isRegulatoryReviewApproved()) {
+    return NextResponse.json({ error: REGULATORY_HOLD_MESSAGE, regulatoryHold: true }, { status: 503 });
+  }
+
   // Burst local (rápido) + distribuído (funciona entre instâncias Vercel).
   if (!rateLimit(`meal-plan:${user.id}`, 5, 3600)) {
     return NextResponse.json({ error: 'Muitas requisições. Tente novamente em breve.' }, { status: 429 });
@@ -38,6 +46,14 @@ export async function POST() {
   const consent = await requireCurrentConsent(supabase, user.id);
   if (!consent.ok) {
     return NextResponse.json({ error: consentReasonMessage(consent.reason!) }, { status: 403 });
+  }
+
+  const healthConsent = await requireHealthDataConsent(supabase, user.id);
+  if (!healthConsent.ok) {
+    return NextResponse.json(
+      { error: healthDataConsentReasonMessage(healthConsent.reason!), healthDataConsent: false },
+      { status: 403 },
+    );
   }
 
   const { data: questionnaire } = (await supabase
@@ -54,10 +70,28 @@ export async function POST() {
 
   // Condições de alto risco não recebem plano personalizado automatizado
   // no MVP — checado antes de consumir cota ou chamar a IA.
-  if (isHighRiskCondition(questionnaire)) {
+  if (getNutritionSafetyMode(questionnaire) === 'restricted') {
     return NextResponse.json(
       { error: MEDICAL_RESTRICTION_MESSAGE, medicalRestriction: true },
       { status: 422 },
+    );
+  }
+
+  // Questionários respondidos antes do campo biological_sex existir
+  // (ver migration 027) não têm o dado necessário para o cálculo
+  // determinístico — pedir para atualizar em vez de fabricar um valor.
+  const energy = calculateEnergyTargets({
+    weightKg: questionnaire.weight,
+    heightCm: questionnaire.height,
+    age: questionnaire.age,
+    biologicalSex: questionnaire.biological_sex,
+    activityLevel: questionnaire.activity_level,
+    goal: questionnaire.goal,
+  });
+  if (!energy) {
+    return NextResponse.json(
+      { error: 'Responda novamente o questionário para informar seu sexo biológico — é necessário para calcular sua meta de calorias.', questionnaireOutdated: true },
+      { status: 400 },
     );
   }
 
@@ -95,7 +129,7 @@ export async function POST() {
   const startedAt = Date.now();
 
   try {
-    const { content, inputTokens, outputTokens } = await generateValidatedMealPlan(questionnaire, knowledgeContext);
+    const { content, inputTokens, outputTokens } = await generateValidatedMealPlan(questionnaire, energy, knowledgeContext);
 
     await logAiUsage({
       userId: user.id,
@@ -149,16 +183,19 @@ export async function POST() {
  */
 async function generateValidatedMealPlan(
   questionnaire: NutritionQuestionnaire,
+  energy: EnergyResult,
   knowledgeContext: string,
 ) {
-  const basePrompt = buildMealPlanPrompt(questionnaire, knowledgeContext);
+  const basePrompt = buildMealPlanPrompt(questionnaire, energy, knowledgeContext);
   let inputTokens = 0;
   let outputTokens = 0;
+  let correctionInstruction = '';
 
+  // No máximo uma tentativa de correção controlada (attempt 0 = original,
+  // attempt 1 = retry único) — se ainda assim vier inconsistente, aborta
+  // sem salvar (ver retorno { content: null } no fim da função).
   for (let attempt = 0; attempt < 2; attempt++) {
-    const extraInstruction = attempt === 0 ? '' :
-      '\n\nATENÇÃO: a geração anterior incluiu alimento(s) proibido(s) por alergia. Gere novamente, ' +
-      'substituindo qualquer alimento da lista de proibições por uma alternativa segura equivalente.';
+    const extraInstruction = correctionInstruction;
 
     const completion = await openai.chat.completions.create({
       model: MODELS.TEXT,
@@ -194,11 +231,26 @@ async function generateValidatedMealPlan(
     content.disclaimer = content.disclaimer || LEGAL_DISCLAIMER;
 
     const forbidden = findForbiddenFoods(content, questionnaire.allergies);
-    if (forbidden.length === 0) {
+    const mathIssues = validateMealPlanMath(content, energy.targetCalories);
+
+    if (forbidden.length === 0 && mathIssues.length === 0) {
       return { content, inputTokens, outputTokens };
     }
 
-    console.warn(`[meal-plan] tentativa ${attempt + 1} continha itens proibidos:`, forbidden);
+    if (forbidden.length > 0) {
+      console.warn(`[meal-plan] tentativa ${attempt + 1} continha itens proibidos:`, forbidden);
+      correctionInstruction =
+        '\n\nATENÇÃO: a geração anterior incluiu alimento(s) proibido(s) por alergia. Gere novamente, ' +
+        'substituindo qualquer alimento da lista de proibições por uma alternativa segura equivalente.';
+    } else {
+      // Nunca loga o conteúdo do plano em si — só os códigos/mensagens
+      // estruturais do que ficou matematicamente inconsistente.
+      console.warn(`[meal-plan] tentativa ${attempt + 1} com inconsistência matemática:`, mathIssues);
+      correctionInstruction =
+        `\n\nATENÇÃO: a geração anterior tinha inconsistência matemática (${mathIssues.map((i) => i.code).join(', ')}). ` +
+        `Gere novamente com total_calories = ${energy.targetCalories} exatamente, macros consistentes com a regra ` +
+        '4 kcal/g (proteína/carboidrato) e 9 kcal/g (gordura), e a soma das calorias das refeições igual ao total.';
+    }
   }
 
   return { content: null, inputTokens, outputTokens };

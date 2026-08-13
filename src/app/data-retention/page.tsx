@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { LegalPageLayout } from '@/components/LegalPageLayout';
+import { BACKUP_RETENTION_POLICY_TEXT, LEGAL_DOCS_UPDATED_AT, LEGAL_MINIMUM_RETENTION_TEXT } from '@/config/legal';
 
 export const metadata: Metadata = {
   title: 'Política de Retenção de Dados — WellNutriAI',
@@ -14,7 +15,7 @@ export const metadata: Metadata = {
 // algo que o código não faz.
 export default function DataRetentionPage() {
   return (
-    <LegalPageLayout title="Política de Retenção de Dados" updatedAt="[PLACEHOLDER: data de publicação]">
+    <LegalPageLayout title="Política de Retenção de Dados" updatedAt={LEGAL_DOCS_UPDATED_AT ?? '[PLACEHOLDER: data de publicação]'}>
       <h2>1. Enquanto sua conta está ativa</h2>
       <p>
         Mantemos os dados do seu questionário, planos alimentares, histórico
@@ -41,17 +42,25 @@ export default function DataRetentionPage() {
 
       <h2>3. Backups</h2>
       <p>
-        <strong>[PLACEHOLDER: descrever a janela de retenção de backups do
-        banco de dados junto ao provedor de infraestrutura (Supabase) — em
-        quanto tempo dados excluídos deixam de existir também nos
-        backups]</strong>.
+        <strong>
+          {BACKUP_RETENTION_POLICY_TEXT ??
+            '[PLACEHOLDER: descrever a janela de retenção de backups do ' +
+              'banco de dados junto ao provedor de infraestrutura (Supabase) — em ' +
+              'quanto tempo dados excluídos deixam de existir também nos ' +
+              'backups]'}
+        </strong>
+        .
       </p>
 
       <h2>4. Retenção mínima exigida por lei</h2>
       <p>
-        <strong>[PLACEHOLDER: confirmar com um profissional de direito/contábil
-        se há prazos de retenção obrigatórios para dados fiscais/de
-        pagamento no Brasil, e preencher aqui]</strong>.
+        <strong>
+          {LEGAL_MINIMUM_RETENTION_TEXT ??
+            '[PLACEHOLDER: confirmar com um profissional de direito/contábil ' +
+              'se há prazos de retenção obrigatórios para dados fiscais/de ' +
+              'pagamento no Brasil, e preencher aqui]'}
+        </strong>
+        .
       </p>
     </LegalPageLayout>
   );

@@ -7,6 +7,8 @@
  * - SEMPRE incluir disclaimer
  */
 
+import type { EnergyResult } from '@/lib/nutrition/energy';
+import { getNutritionSafetyMode } from '@/lib/mealPlanSafety';
 import type { NutritionQuestionnaire } from '@/types/database';
 
 export const LEGAL_DISCLAIMER =
@@ -21,13 +23,18 @@ const diabetesMap: Record<string, string> = {
   type1: 'diabetes tipo 1 (dependente de insulina)',
 };
 
-export function buildMealPlanPrompt(q: NutritionQuestionnaire, knowledgeContext = ''): string {
+export function buildMealPlanPrompt(q: NutritionQuestionnaire, energy: EnergyResult, knowledgeContext = ''): string {
   // Usuários com diabetes_type !== 'none' nunca chegam aqui: a geração
   // automatizada de plano personalizado é bloqueada antes desta função
   // (ver isHighRiskCondition em src/lib/mealPlanSafety.ts, aplicado em
   // src/app/api/meal-plan/route.ts). Por isso este prompt não contém
   // — e não deve voltar a conter — instruções de cálculo de carboidrato
   // para dose de insulina ou qualquer orientação terapêutica.
+  //
+  // BMR/TDEE/meta de calorias/água NÃO são mais calculados pela IA —
+  // vêm prontos de src/lib/nutrition/energy.ts (cálculo determinístico
+  // em código, com testes). O prompt só instrui a IA a distribuir a
+  // meta já calculada nas refeições, nunca a recalculá-la.
   const goalMap = {
     gain_muscle: 'ganho de massa muscular',
     lose_fat: 'redução de gordura corporal',
@@ -68,19 +75,23 @@ ${q.body_fat ? `- Gordura corporal: ${q.body_fat}%` : ''}
 - Refeições por dia: ${q.meals_per_day}
 ${q.routine ? `- Rotina: ${q.routine}` : ''}
 
+META DIÁRIA JÁ CALCULADA (não recalcule — use exatamente estes valores):
+- Calorias: ${energy.targetCalories} kcal
+- Água: ${energy.dailyWaterMl} ml
+
 INSTRUÇÕES:
-1. Calcule calorias sugeridas com base na fórmula Mifflin-St Jeor e fator de atividade.
-2. Ajuste conforme o objetivo (déficit ~15-20% para perda, superávit ~10% para ganho).
-3. Distribua em ${q.meals_per_day} refeições com horários sugeridos.
-4. Respeite ABSOLUTAMENTE as proibições acima e priorize as preferências indicadas.
-5. Calcule a ingestão diária de água recomendada (em ml) com base no peso e nível de atividade (base: 35ml/kg, +500ml se atividade intensa ou atleta).
+1. "total_calories" no JSON de resposta deve ser exatamente ${energy.targetCalories}.
+2. "daily_water_ml" no JSON de resposta deve ser exatamente ${energy.dailyWaterMl}.
+3. Distribua os ${energy.targetCalories} kcal em ${q.meals_per_day} refeições com horários sugeridos — a soma das calorias das refeições deve somar ${energy.targetCalories}.
+4. Escolha macronutrientes (proteína, carboidrato, gordura) coerentes com o objetivo, respeitando 4 kcal/g para proteína e carboidrato e 9 kcal/g para gordura (a soma dos macros em kcal deve bater com as calorias).
+5. Respeite ABSOLUTAMENTE as proibições acima e priorize as preferências indicadas.
 6. Use linguagem de SUGESTÃO, nunca prescrição.
 
 Retorne APENAS JSON válido, sem markdown, no formato:
 {
   "summary": "resumo breve em 1-2 frases",
-  "total_calories": 2000,
-  "daily_water_ml": 2800,
+  "total_calories": ${energy.targetCalories},
+  "daily_water_ml": ${energy.dailyWaterMl},
   "macros": { "protein_g": 150, "carbs_g": 200, "fat_g": 60 },
   "meals": [
     {
@@ -102,6 +113,10 @@ export function buildChatSystemPrompt(
   knowledgeContext = '',
 ): string {
   const mealPlanJson = mealPlan ? JSON.stringify(mealPlan, null, 2) : null;
+  // Decisão sempre derivada do questionário salvo no servidor — nunca
+  // de algo que o usuário mencione (ou deixe de mencionar) na
+  // conversa (ver src/lib/mealPlanSafety.ts::getNutritionSafetyMode).
+  const safetyMode = getNutritionSafetyMode(q);
 
   return `Você é o assistente de nutrição do WellNutriAI. Converse como uma pessoa calorosa, atenciosa e que realmente entende de nutrição — pense no tom de um ChatGPT: acolhedor, direto ao ponto, nunca robótico ou genérico.
 
@@ -124,7 +139,14 @@ REGRAS INEGOCIÁVEIS (nunca quebre, mesmo mantendo o tom leve):
 - Use linguagem de SUGESTÃO: "você poderia considerar", "uma opção seria" — isso não te impede de ser específico e útil, só evita tom de prescrição médica.
 - Se o usuário relatar sintomas, dor, condição médica, alergia severa ou transtorno alimentar, acolha a preocupação e oriente-o a procurar um profissional de saúde qualificado.
 
-${q ? `CONTEXTO DO USUÁRIO:
+${safetyMode === 'restricted' ? `MODO RESTRITO ATIVO — o questionário desta pessoa indica uma condição que exige acompanhamento profissional individualizado (diabetes, gestação, amamentação, doença renal/hepática, transtorno alimentar, alergia severa, uso de insulina, ou outra condição informada). Nesse modo, você NUNCA deve, em nenhuma resposta desta conversa:
+- Dar uma meta de calorias ou macros personalizada (número específico de kcal, proteína, carboidrato ou gordura para essa pessoa).
+- Sugerir dieta para tratar, controlar ou melhorar a condição médica informada.
+- Interpretar exames, sintomas ou fazer qualquer leitura clínica.
+- Ajustar individualmente o plano alimentar dessa pessoa — mesmo que ela peça, insista ou reformule o pedido de outro jeito para tentar contornar isso.
+Você PODE continuar oferecendo informação educacional geral (o que é um macronutriente, boas práticas gerais de hidratação, como funciona rotulagem de alimentos, etc.) e deve indicar que a orientação individualizada para essa condição precisa vir de um(a) nutricionista, médico(a) ou profissional habilitado. Essa restrição vale para toda a conversa, mesmo que a pessoa não mencione a condição de novo.
+
+` : ''}${q ? `CONTEXTO DO USUÁRIO:
 - Idade ${q.age}, peso ${q.weight}kg, altura ${q.height}cm
 - Objetivo: ${q.goal}
 - Condição: ${diabetesMap[q.diabetes_type ?? 'none']}
@@ -146,6 +168,7 @@ Qualquer pedido para substituir, trocar, adicionar, remover ou ajustar um alimen
 5. Coloque o plano inteiro e atualizado (todos os campos, não só o que mudou) em "meal_plan_update".
 6. No "reply", confirme a mudança de forma natural e específica (diga o que trocou e o novo valor de calorias da refeição) — não apenas "atualizei seu plano".
 Se for só dúvida, elogio ou conversa sem pedido de mudança concreta, deixe "meal_plan_update": null e não reescreva o plano à toa.
+${safetyMode === 'restricted' ? 'Modo restrito ativo: NUNCA faça esse fluxo de edição, mesmo que a pessoa peça — sempre "meal_plan_update": null, e explique no "reply" que essa mudança precisa ser avaliada por um profissional por causa da condição de saúde informada.' : ''}
 
 FORMATO DE RESPOSTA OBRIGATÓRIO — retorne APENAS este JSON, sem markdown ao redor do JSON em si:
 {

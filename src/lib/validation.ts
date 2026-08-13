@@ -39,6 +39,10 @@ export const questionnaireSchema = z.object({
     (v) => (v === '' || v === null || v === undefined ? null : Number(v)),
     z.number().min(3).max(60).nullable().optional()
   ),
+  // Obrigatório: entrada necessária da fórmula de Mifflin-St Jeor (ver
+  // src/lib/nutrition/energy.ts) — nunca inferido, sempre informado
+  // explicitamente pela pessoa.
+  biological_sex: z.enum(['male', 'female']),
   goal: z.enum(['gain_muscle', 'lose_fat', 'maintain']),
   activity_level: z.enum(['sedentary', 'light', 'moderate', 'intense', 'athlete']),
   diabetes_type: z.enum(['none', 'type1', 'type2', 'pre_diabetes']),

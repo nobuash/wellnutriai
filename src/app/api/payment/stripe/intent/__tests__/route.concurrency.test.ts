@@ -68,9 +68,25 @@ vi.mock('@/lib/consentCheck', () => ({
   consentReasonMessage: vi.fn(() => 'consent error'),
 }));
 
+// null = sem questionário ainda respondido (getNutritionSafetyMode(null)
+// é 'standard', não bloqueia nada — o padrão nos testes de concorrência
+// abaixo, que existem pra provar reserva, não o gate de perfil).
+let mockQuestionnaireRow: Record<string, unknown> | null = null;
+
 vi.mock('@/lib/supabase/server', () => ({
   createClient: () => ({
     auth: { getUser: async () => ({ data: { user: { id: 'user-1', email: 'user@example.com' } } }) },
+    from: () => ({
+      select: () => ({
+        eq: () => ({
+          order: () => ({
+            limit: () => ({
+              maybeSingle: async () => ({ data: mockQuestionnaireRow, error: null }),
+            }),
+          }),
+        }),
+      }),
+    }),
   }),
 }));
 
@@ -145,6 +161,7 @@ describe('POST /api/payment/stripe/intent — concorrência de checkout', () => 
     nextId = 1;
     createdSessions.clear();
     createSessionMock.mockClear();
+    mockQuestionnaireRow = null;
   });
 
   it('duas requisições concorrentes (duplo clique) criam no máximo uma Checkout Session efetiva', async () => {
@@ -195,5 +212,38 @@ describe('POST /api/payment/stripe/intent — concorrência de checkout', () => 
     } else {
       expect(json2.error).toBeTruthy();
     }
+  });
+});
+
+describe('POST /api/payment/stripe/intent — perfil de alto risco não inicia checkout', () => {
+  beforeEach(() => {
+    reservations = [];
+    nextId = 1;
+    createdSessions.clear();
+    createSessionMock.mockClear();
+    mockQuestionnaireRow = null;
+  });
+
+  it('bloqueia com 422 e nunca cria Checkout Session quando o questionário indica condição de alto risco', async () => {
+    mockQuestionnaireRow = { diabetes_type: 'type2', is_pregnant: false, is_breastfeeding: false, has_kidney_disease: false, has_liver_disease: false, has_eating_disorder_history: false, has_severe_allergy: false, uses_insulin: false, other_medical_condition: null };
+
+    const { POST } = await import('@/app/api/payment/stripe/intent/route');
+    const res = await POST(buildRequest());
+    const json = await res.json();
+
+    expect(res.status).toBe(422);
+    expect(json.restrictedProfile).toBe(true);
+    expect(createSessionMock).not.toHaveBeenCalled();
+  });
+
+  it('não bloqueia quando o questionário não tem nenhuma condição de risco', async () => {
+    mockQuestionnaireRow = { diabetes_type: 'none', is_pregnant: false, is_breastfeeding: false, has_kidney_disease: false, has_liver_disease: false, has_eating_disorder_history: false, has_severe_allergy: false, uses_insulin: false, other_medical_condition: null };
+
+    const { POST } = await import('@/app/api/payment/stripe/intent/route');
+    const res = await POST(buildRequest());
+    const json = await res.json();
+
+    expect(json.clientSecret).toBeTruthy();
+    expect(createSessionMock).toHaveBeenCalledTimes(1);
   });
 });

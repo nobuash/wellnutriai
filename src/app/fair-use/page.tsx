@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { LegalPageLayout } from '@/components/LegalPageLayout';
 import { PLAN_LIMITS } from '@/lib/plans';
+import { LEGAL_DOCS_UPDATED_AT } from '@/config/legal';
 
 export const metadata: Metadata = {
   title: 'Política de Uso Justo — WellNutriAI',
@@ -11,7 +12,7 @@ export const metadata: Metadata = {
 
 export default function FairUsePage() {
   return (
-    <LegalPageLayout title="Política de Uso Justo" updatedAt="[PLACEHOLDER: data de publicação]">
+    <LegalPageLayout title="Política de Uso Justo" updatedAt={LEGAL_DOCS_UPDATED_AT ?? '[PLACEHOLDER: data de publicação]'}>
       <p>
         As funcionalidades de inteligência artificial do WellNutriAI (geração
         de plano alimentar, chat e análise de foto) têm custo real por uso.
