@@ -7,10 +7,10 @@ import { useEffect } from 'react';
 const GA_MEASUREMENT_ID = process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID;
 
 // Só carrega se NEXT_PUBLIC_GA_MEASUREMENT_ID estiver definido — sem
-// essa variável, nenhum script de terceiro é solicitado. Antes de
-// configurá-la em produção, confirme que o site tem uma base legal
-// (consentimento ou legítimo interesse documentado) para o tracking,
-// já que o projeto ainda não tem banner de cookies (ver auditoria).
+// essa variável, nenhum script de terceiro é solicitado. Quem decide
+// SE e QUANDO este componente é montado é o ConsentBanner (só depois
+// de consentimento explícito do usuário) — não monte este componente
+// diretamente em outro lugar do app.
 export function GoogleAnalytics() {
   const pathname = usePathname();
 
