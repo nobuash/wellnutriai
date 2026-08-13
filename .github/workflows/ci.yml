@@ -33,7 +33,7 @@ jobs:
       MP_WEBHOOK_SECRET: ci-placeholder-mp-webhook-secret
       NEXT_PUBLIC_MP_PUBLIC_KEY: TEST-ci-placeholder-public-key
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - uses: actions/setup-node@v4
         with:
