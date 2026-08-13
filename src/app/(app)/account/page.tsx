@@ -46,37 +46,37 @@ export default function AccountPage() {
   return (
     <div className="space-y-6 max-w-2xl">
       <div>
-        <h1 className="text-2xl font-bold">Minha conta</h1>
-        <p className="text-sm text-slate-500">Dados da sua conta e opções de privacidade.</p>
+        <h1 className="font-display text-2xl text-ink">Minha conta</h1>
+        <p className="text-sm text-ink-muted mt-1">Dados da sua conta e opções de privacidade.</p>
       </div>
 
       <Card>
-        <h3 className="font-semibold mb-3">Dados</h3>
+        <h3 className="font-semibold text-ink mb-3">Dados</h3>
         <div className="space-y-2 text-sm">
-          <p><span className="text-slate-500">Nome:</span> {profile?.name || '—'}</p>
-          <p><span className="text-slate-500">E-mail:</span> {profile?.email}</p>
-          <p><span className="text-slate-500">Plano:</span> {profile?.plan === 'pro' ? 'PRO' : 'Free'}</p>
+          <p><span className="text-ink-muted">Nome:</span> <span className="text-ink-secondary">{profile?.name || '—'}</span></p>
+          <p><span className="text-ink-muted">E-mail:</span> <span className="text-ink-secondary">{profile?.email}</span></p>
+          <p><span className="text-ink-muted">Plano:</span> <span className="text-ink-secondary">{profile?.plan === 'pro' ? 'PRO' : 'Free'}</span></p>
         </div>
       </Card>
 
-      <Card className="border-red-200">
+      <Card className="border-error/30">
         <div className="flex gap-3">
-          <AlertTriangle className="h-5 w-5 text-red-500 shrink-0 mt-0.5" />
+          <AlertTriangle className="h-5 w-5 text-error shrink-0 mt-0.5" />
           <div className="flex-1">
-            <h3 className="font-semibold text-red-700 mb-1">Excluir conta</h3>
-            <p className="text-sm text-slate-600 mb-4">
+            <h3 className="font-semibold text-error mb-1">Excluir conta</h3>
+            <p className="text-sm text-ink-secondary mb-4">
               Isso apaga permanentemente seus questionários, planos alimentares, histórico de chat,
               análises de refeição, registros de água/calorias e fotos enviadas. Se você tiver uma
               assinatura com renovação automática, ela será cancelada. Essa ação não pode ser desfeita.
             </p>
 
             {!confirming ? (
-              <Button variant="outline" className="border-red-300 text-red-700 hover:bg-red-50" onClick={() => setConfirming(true)}>
+              <Button variant="outline" className="border-error/40 text-error hover:bg-error/5" onClick={() => setConfirming(true)}>
                 <Trash2 className="h-4 w-4" /> Excluir minha conta
               </Button>
             ) : (
-              <div className="space-y-3 rounded-lg border border-red-200 bg-red-50 p-4">
-                <p className="text-sm text-red-700 font-medium">
+              <div className="space-y-3 rounded-md border border-error/30 bg-error/5 p-4">
+                <p className="text-sm text-error font-medium">
                   Digite sua senha para confirmar. Essa ação é definitiva.
                 </p>
                 <Input
@@ -88,7 +88,7 @@ export default function AccountPage() {
                 />
                 <div className="flex gap-2">
                   <Button
-                    className="flex-1 bg-red-600 hover:bg-red-700"
+                    className="flex-1 bg-error hover:bg-error/90"
                     loading={deleteMutation.isPending}
                     disabled={!password}
                     onClick={() => deleteMutation.mutate()}

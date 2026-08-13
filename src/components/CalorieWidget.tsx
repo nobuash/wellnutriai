@@ -76,11 +76,11 @@ export function CalorieWidget({ goalKcal }: { goalKcal: number | null }) {
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Flame className="h-5 w-5 text-red-500" />
-          <span className="font-semibold text-slate-700">Calorias de hoje</span>
+          <span className="font-semibold text-ink">Calorias de hoje</span>
         </div>
         <div className="flex items-center gap-3">
           {goalKcal && (
-            <span className="text-sm text-slate-400">Meta: {goalKcal} kcal</span>
+            <span className="text-sm text-ink-muted">Meta: {goalKcal} kcal</span>
           )}
           {logs.length > 0 && (
             <button
@@ -97,23 +97,21 @@ export function CalorieWidget({ goalKcal }: { goalKcal: number | null }) {
       {/* Total + barra */}
       <div>
         <div className="flex items-end justify-between mb-1.5">
-          <span className={`text-3xl font-bold ${exceeded ? 'text-red-600' : 'text-red-500'}`}>
+          <span className={`text-3xl font-semibold ${exceeded ? 'text-red-600' : 'text-red-500'}`}>
             {totalKcal} kcal
           </span>
           {percent !== null && (
-            <span className={`text-sm mb-1 ${exceeded ? 'text-red-500 font-semibold' : 'text-slate-400'}`}>
+            <span className={`text-sm mb-1 ${exceeded ? 'text-red-500 font-semibold' : 'text-ink-muted'}`}>
               {percent}%{exceeded ? ' — meta ultrapassada' : ''}
             </span>
           )}
         </div>
 
         {goalKcal && (
-          <div className="w-full bg-slate-100 rounded-full h-3 overflow-hidden">
+          <div className="w-full bg-surface-secondary rounded-full h-2 overflow-hidden">
             <div
-              className={`h-3 rounded-full transition-all duration-500 ${
-                exceeded
-                  ? 'bg-gradient-to-r from-red-500 to-red-700'
-                  : 'bg-gradient-to-r from-red-300 to-red-500'
+              className={`h-2 rounded-full transition-all duration-500 ${
+                exceeded ? 'bg-red-600' : 'bg-red-400'
               }`}
               style={{ width: `${Math.min(100, percent ?? 0)}%` }}
             />
@@ -121,7 +119,7 @@ export function CalorieWidget({ goalKcal }: { goalKcal: number | null }) {
         )}
 
         {!goalKcal && (
-          <p className="text-xs text-slate-400">
+          <p className="text-xs text-ink-muted">
             Gere um plano alimentar para definir sua meta calórica diária.
           </p>
         )}
@@ -133,24 +131,24 @@ export function CalorieWidget({ goalKcal }: { goalKcal: number | null }) {
           {logs.map((log) => (
             <div
               key={log.id}
-              className="flex items-center justify-between text-sm py-1.5 px-2 rounded-lg hover:bg-slate-50"
+              className="flex items-center justify-between text-sm py-1.5 px-2 rounded-sm hover:bg-surface-secondary transition-colors duration-200"
             >
               <div className="flex items-center gap-2 min-w-0">
                 <Flame className="h-3.5 w-3.5 text-red-400 shrink-0" />
                 <div className="min-w-0">
                   <span className="font-medium text-red-700">{log.calories} kcal</span>
                   {log.description && (
-                    <span className="text-xs text-slate-400 ml-1.5 truncate block">
+                    <span className="text-xs text-ink-muted ml-1.5 truncate block">
                       {log.description}
                     </span>
                   )}
                 </div>
               </div>
               <div className="flex items-center gap-2 shrink-0">
-                <span className="text-xs text-slate-400">{formatTime(log.logged_at)}</span>
+                <span className="text-xs text-ink-muted">{formatTime(log.logged_at)}</span>
                 <button
                   onClick={() => deleteMutation.mutate(log.id)}
-                  className="text-slate-300 hover:text-red-400 transition-colors"
+                  className="text-ink-muted/60 hover:text-red-500 transition-colors"
                 >
                   <Trash2 className="h-3.5 w-3.5" />
                 </button>
@@ -159,7 +157,7 @@ export function CalorieWidget({ goalKcal }: { goalKcal: number | null }) {
           ))}
         </div>
       ) : (
-        <p className="text-sm text-slate-400 text-center py-2">
+        <p className="text-sm text-ink-muted text-center py-2">
           Nenhuma refeição registrada hoje. Analise uma refeição para começar.
         </p>
       )}

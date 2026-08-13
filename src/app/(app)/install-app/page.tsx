@@ -66,21 +66,21 @@ export default function InstallAppPage() {
   return (
     <div className="space-y-6 max-w-2xl">
       <div>
-        <h1 className="text-2xl font-bold flex items-center gap-2">
-          <Smartphone className="h-6 w-6 text-brand-600" />
+        <h1 className="font-display text-2xl text-ink flex items-center gap-2">
+          <Smartphone className="h-6 w-6 text-primary-600" />
           Instalar no celular
         </h1>
-        <p className="text-sm text-slate-500 mt-1">
+        <p className="text-sm text-ink-muted mt-1">
           Use o WellNutriAI como um app nativo — sem precisar de loja de aplicativos.
         </p>
       </div>
 
       {/* Seletor iOS / Android */}
-      <div className="flex gap-2 p-1 bg-slate-100 rounded-lg w-fit">
+      <div className="flex gap-2 p-1 bg-surface-secondary rounded-lg w-fit">
         <button
           onClick={() => setOs('ios')}
           className={`flex items-center gap-2 px-5 py-2 rounded-md text-sm font-medium transition-colors ${
-            os === 'ios' ? 'bg-white shadow-sm text-slate-900' : 'text-slate-500 hover:text-slate-700'
+            os === 'ios' ? 'bg-white shadow-sm text-ink' : 'text-ink-muted hover:text-ink-secondary'
           }`}
         >
           {/* Apple icon SVG */}
@@ -92,7 +92,7 @@ export default function InstallAppPage() {
         <button
           onClick={() => setOs('android')}
           className={`flex items-center gap-2 px-5 py-2 rounded-md text-sm font-medium transition-colors ${
-            os === 'android' ? 'bg-white shadow-sm text-slate-900' : 'text-slate-500 hover:text-slate-700'
+            os === 'android' ? 'bg-white shadow-sm text-ink' : 'text-ink-muted hover:text-ink-secondary'
           }`}
         >
           {/* Android icon SVG */}
@@ -105,7 +105,7 @@ export default function InstallAppPage() {
 
       {/* Aviso especial iOS */}
       {os === 'ios' && (
-        <div className="flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+        <div className="flex items-start gap-3 rounded-md border border-warning/30 bg-warning/10 px-4 py-3 text-sm text-warning">
           <svg className="h-5 w-5 shrink-0 mt-0.5" viewBox="0 0 24 24" fill="currentColor">
             <path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.8-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z"/>
           </svg>
@@ -119,22 +119,22 @@ export default function InstallAppPage() {
           <div key={step.number} className="relative">
             {/* Linha conectora */}
             {idx < steps.length - 1 && (
-              <div className="absolute left-5 top-12 bottom-0 w-0.5 bg-slate-100" style={{ height: 'calc(100% + 1.5rem)' }} />
+              <div className="absolute left-5 top-12 bottom-0 w-0.5 bg-surface-secondary" style={{ height: 'calc(100% + 1.5rem)' }} />
             )}
 
             <div className="flex gap-4">
               {/* Número */}
-              <div className={`shrink-0 h-10 w-10 rounded-full flex items-center justify-center font-bold text-sm z-10 ${
+              <div className={`shrink-0 h-10 w-10 rounded-full flex items-center justify-center font-semibold text-sm z-10 ${
                 os === 'ios'
-                  ? 'bg-slate-900 text-white'
-                  : 'bg-green-600 text-white'
+                  ? 'bg-secondary text-white'
+                  : 'bg-primary-600 text-white'
               }`}>
                 {step.number}
               </div>
 
               <div className="flex-1 pb-6">
-                <h3 className="font-semibold text-slate-800 mb-1">{step.title}</h3>
-                <p className="text-sm text-slate-500 mb-4">{step.description}</p>
+                <h3 className="font-semibold text-ink mb-1">{step.title}</h3>
+                <p className="text-sm text-ink-muted mb-4">{step.description}</p>
 
                 {/* Mockup visual */}
                 <div className="flex justify-center">
@@ -147,12 +147,12 @@ export default function InstallAppPage() {
       </div>
 
       {/* Resultado final */}
-      <div className={`rounded-2xl p-5 text-center ${os === 'ios' ? 'bg-slate-50 border border-slate-200' : 'bg-green-50 border border-green-200'}`}>
-        <div className={`h-14 w-14 rounded-2xl mx-auto mb-3 flex items-center justify-center shadow-md ${os === 'ios' ? 'bg-white' : 'bg-white'}`}>
+      <div className={`rounded-lg p-5 text-center ${os === 'ios' ? 'bg-surface-secondary border border-border' : 'bg-primary-50 border border-primary-200'}`}>
+        <div className="h-14 w-14 rounded-lg mx-auto mb-3 flex items-center justify-center shadow-soft bg-surface">
           <span className="text-3xl">🥗</span>
         </div>
-        <p className="font-semibold text-slate-800">Pronto! App instalado.</p>
-        <p className="text-sm text-slate-500 mt-1">
+        <p className="font-semibold text-ink">Pronto! App instalado.</p>
+        <p className="text-sm text-ink-muted mt-1">
           O WellNutriAI vai abrir em tela cheia, sem barra do browser, igual a um app nativo.
         </p>
       </div>
@@ -164,7 +164,7 @@ export default function InstallAppPage() {
 
 function PhoneFrame({ children, dark = false }: { children: React.ReactNode; dark?: boolean }) {
   return (
-    <div className={`relative w-56 rounded-[2rem] border-4 shadow-xl overflow-hidden ${dark ? 'border-slate-800 bg-slate-900' : 'border-slate-300 bg-white'}`}>
+    <div className={`relative w-56 rounded-[2rem] border-4 shadow-xl overflow-hidden ${dark ? 'border-slate-800 bg-slate-900' : 'border-border bg-white'}`}>
       {/* Notch */}
       <div className={`h-6 flex items-center justify-center ${dark ? 'bg-slate-900' : 'bg-white'}`}>
         <div className="h-3 w-16 rounded-full bg-slate-800" />
@@ -182,10 +182,10 @@ function SafariMockup() {
   return (
     <PhoneFrame>
       {/* Safari chrome */}
-      <div className="bg-slate-100 px-2 py-1.5">
-        <div className="bg-white rounded-lg px-3 py-1 flex items-center gap-1 border border-slate-200">
+      <div className="bg-surface-secondary px-2 py-1.5">
+        <div className="bg-white rounded-lg px-3 py-1 flex items-center gap-1 border border-border">
           <div className="h-2 w-2 rounded-full bg-green-500" />
-          <span className="text-[10px] text-slate-500 flex-1 text-center">wellnutriai.com</span>
+          <span className="text-[10px] text-ink-muted flex-1 text-center">wellnutriai.com</span>
         </div>
       </div>
       {/* Page content preview */}
@@ -194,12 +194,12 @@ function SafariMockup() {
           <div className="h-6 w-6 rounded bg-green-100" />
           <div className="h-3 w-24 rounded bg-slate-200" />
         </div>
-        <div className="h-2 w-full rounded bg-slate-100" />
-        <div className="h-2 w-4/5 rounded bg-slate-100" />
+        <div className="h-2 w-full rounded bg-surface-secondary" />
+        <div className="h-2 w-4/5 rounded bg-surface-secondary" />
         <div className="h-8 w-full rounded-lg bg-green-500 mt-3" />
       </div>
       {/* Safari bottom bar */}
-      <div className="bg-slate-100 border-t border-slate-200 px-4 py-2 flex items-center justify-between">
+      <div className="bg-surface-secondary border-t border-border px-4 py-2 flex items-center justify-between">
         <div className="h-4 w-4 rounded bg-slate-300" />
         <div className="h-4 w-4 rounded bg-slate-300" />
         <div className="flex flex-col items-center gap-0.5 text-blue-500">
@@ -215,19 +215,19 @@ function SafariMockup() {
 function ShareButtonMockup() {
   return (
     <PhoneFrame>
-      <div className="bg-slate-100 px-2 py-1.5">
-        <div className="bg-white rounded-lg px-3 py-1 flex items-center gap-1 border border-slate-200">
+      <div className="bg-surface-secondary px-2 py-1.5">
+        <div className="bg-white rounded-lg px-3 py-1 flex items-center gap-1 border border-border">
           <div className="h-2 w-2 rounded-full bg-green-500" />
-          <span className="text-[10px] text-slate-500 flex-1 text-center">wellnutriai.com</span>
+          <span className="text-[10px] text-ink-muted flex-1 text-center">wellnutriai.com</span>
         </div>
       </div>
       <div className="bg-white px-3 py-4 space-y-2" style={{ minHeight: 140 }}>
-        <div className="h-2 w-full rounded bg-slate-100" />
-        <div className="h-2 w-4/5 rounded bg-slate-100" />
-        <div className="h-2 w-3/5 rounded bg-slate-100" />
+        <div className="h-2 w-full rounded bg-surface-secondary" />
+        <div className="h-2 w-4/5 rounded bg-surface-secondary" />
+        <div className="h-2 w-3/5 rounded bg-surface-secondary" />
       </div>
       {/* Safari bottom bar — share destacado */}
-      <div className="bg-slate-100 border-t border-slate-200 px-4 py-2 flex items-center justify-between">
+      <div className="bg-surface-secondary border-t border-border px-4 py-2 flex items-center justify-between">
         <div className="h-4 w-4 rounded bg-slate-300" />
         <div className="h-4 w-4 rounded bg-slate-300" />
         {/* Share button em destaque */}
@@ -255,11 +255,11 @@ function AddToHomeMockupIOS() {
   return (
     <PhoneFrame>
       <div className="bg-white px-3 py-2 space-y-1" style={{ minHeight: 50 }}>
-        <div className="h-2 w-full rounded bg-slate-100" />
-        <div className="h-2 w-3/5 rounded bg-slate-100" />
+        <div className="h-2 w-full rounded bg-surface-secondary" />
+        <div className="h-2 w-3/5 rounded bg-surface-secondary" />
       </div>
       {/* Sheet */}
-      <div className="bg-slate-100 rounded-t-2xl px-3 py-2">
+      <div className="bg-surface-secondary rounded-t-2xl px-3 py-2">
         <div className="h-1 w-10 rounded-full bg-slate-300 mx-auto mb-2" />
         {/* Ícones de compartilhamento */}
         <div className="flex gap-3 justify-center mb-3">
@@ -278,7 +278,7 @@ function AddToHomeMockupIOS() {
               className={`flex items-center gap-2 px-3 py-2 ${item.highlight ? 'bg-blue-50' : ''}`}
             >
               <span className="text-base">{item.icon}</span>
-              <span className={`text-[11px] ${item.highlight ? 'text-blue-600 font-semibold' : 'text-slate-700'}`}>
+              <span className={`text-[11px] ${item.highlight ? 'text-blue-600 font-semibold' : 'text-ink-secondary'}`}>
                 {item.label}
               </span>
               {item.highlight && (
@@ -297,22 +297,22 @@ function AddToHomeMockupIOS() {
 function ConfirmMockupIOS() {
   return (
     <PhoneFrame>
-      <div className="bg-slate-100 px-2 py-1.5">
-        <div className="bg-white rounded-lg px-3 py-1 flex items-center gap-1 border border-slate-200">
-          <span className="text-[10px] text-slate-400 flex-1">Adicionar à Tela de Início</span>
+      <div className="bg-surface-secondary px-2 py-1.5">
+        <div className="bg-white rounded-lg px-3 py-1 flex items-center gap-1 border border-border">
+          <span className="text-[10px] text-ink-muted flex-1">Adicionar à Tela de Início</span>
         </div>
       </div>
       <div className="bg-white px-4 py-4 space-y-3" style={{ minHeight: 140 }}>
         {/* Dialog */}
-        <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 space-y-2">
+        <div className="rounded-xl border border-border bg-surface-secondary p-3 space-y-2">
           <div className="flex items-center gap-3">
             <div className="h-12 w-12 rounded-xl bg-green-100 flex items-center justify-center text-xl shadow-sm">🥗</div>
             <div>
-              <p className="text-xs font-semibold text-slate-800">WellNutriAI</p>
-              <p className="text-[10px] text-slate-400">wellnutriai.com</p>
+              <p className="text-xs font-semibold text-ink">WellNutriAI</p>
+              <p className="text-[10px] text-ink-muted">wellnutriai.com</p>
             </div>
           </div>
-          <p className="text-[10px] text-slate-500 leading-relaxed">
+          <p className="text-[10px] text-ink-muted leading-relaxed">
             Um ícone será adicionado à sua Tela de Início para acesso rápido a este website.
           </p>
         </div>
@@ -336,7 +336,7 @@ function ChromeMockup() {
           <div className="h-2 w-2 rounded-full bg-green-500" />
           <span className="text-[10px] text-slate-300 flex-1 text-center">wellnutriai.com</span>
         </div>
-        <MoreVertical className="h-4 w-4 text-slate-400" />
+        <MoreVertical className="h-4 w-4 text-ink-muted" />
       </div>
       {/* Page */}
       <div className="bg-white px-3 py-4 space-y-2" style={{ minHeight: 140 }}>
@@ -344,8 +344,8 @@ function ChromeMockup() {
           <div className="h-6 w-6 rounded bg-green-100" />
           <div className="h-3 w-24 rounded bg-slate-200" />
         </div>
-        <div className="h-2 w-full rounded bg-slate-100" />
-        <div className="h-2 w-4/5 rounded bg-slate-100" />
+        <div className="h-2 w-full rounded bg-surface-secondary" />
+        <div className="h-2 w-4/5 rounded bg-surface-secondary" />
         <div className="h-8 w-full rounded-lg bg-green-500 mt-3" />
       </div>
     </PhoneFrame>
@@ -366,11 +366,11 @@ function ChromeMenuMockup() {
         </div>
       </div>
       <div className="bg-white px-3 py-2 space-y-1.5" style={{ minHeight: 100 }}>
-        <div className="h-2 w-full rounded bg-slate-100" />
-        <div className="h-2 w-3/5 rounded bg-slate-100" />
+        <div className="h-2 w-full rounded bg-surface-secondary" />
+        <div className="h-2 w-3/5 rounded bg-surface-secondary" />
       </div>
       {/* Menu dropdown */}
-      <div className="bg-white border-t border-slate-100 rounded-b-none">
+      <div className="bg-white border-t border-divider rounded-b-none">
         {['Nova aba', 'Nova guia anônima', 'Histórico', 'Adicionar à tela inicial'].map((item) => {
           const highlight = item === 'Adicionar à tela inicial';
           return (
@@ -378,8 +378,8 @@ function ChromeMenuMockup() {
               key={item}
               className={`flex items-center gap-2 px-3 py-2 border-b border-slate-50 ${highlight ? 'bg-green-50' : ''}`}
             >
-              <Plus className={`h-3 w-3 ${highlight ? 'text-green-600' : 'text-slate-400'}`} />
-              <span className={`text-[11px] ${highlight ? 'text-green-700 font-semibold' : 'text-slate-600'}`}>
+              <Plus className={`h-3 w-3 ${highlight ? 'text-green-600' : 'text-ink-muted'}`} />
+              <span className={`text-[11px] ${highlight ? 'text-green-700 font-semibold' : 'text-ink-secondary'}`}>
                 {item}
               </span>
             </div>
@@ -397,18 +397,18 @@ function AddToHomeMockupAndroid() {
         <div className="flex-1 bg-slate-700 rounded-lg px-3 py-1">
           <span className="text-[10px] text-slate-300">wellnutriai.com</span>
         </div>
-        <MoreVertical className="h-4 w-4 text-slate-400" />
+        <MoreVertical className="h-4 w-4 text-ink-muted" />
       </div>
       <div className="bg-white px-3 py-3 space-y-1.5" style={{ minHeight: 90 }}>
-        <div className="h-2 w-full rounded bg-slate-100" />
-        <div className="h-2 w-4/5 rounded bg-slate-100" />
+        <div className="h-2 w-full rounded bg-surface-secondary" />
+        <div className="h-2 w-4/5 rounded bg-surface-secondary" />
       </div>
       {/* Banner de instalação Android */}
       <div className="bg-white border-t-2 border-green-500 px-3 py-3 flex items-center gap-3">
         <div className="h-10 w-10 rounded-xl bg-green-100 flex items-center justify-center text-lg">🥗</div>
         <div className="flex-1">
-          <p className="text-[11px] font-semibold text-slate-800">WellNutriAI</p>
-          <p className="text-[10px] text-slate-400">Adicionar à tela inicial</p>
+          <p className="text-[11px] font-semibold text-ink">WellNutriAI</p>
+          <p className="text-[10px] text-ink-muted">Adicionar à tela inicial</p>
         </div>
         <div className="bg-green-600 text-white text-[10px] font-bold px-2 py-1 rounded-lg">
           Instalar
@@ -425,11 +425,11 @@ function ConfirmMockupAndroid() {
         <div className="flex-1 bg-slate-700 rounded-lg px-3 py-1">
           <span className="text-[10px] text-slate-300">wellnutriai.com</span>
         </div>
-        <MoreVertical className="h-4 w-4 text-slate-400" />
+        <MoreVertical className="h-4 w-4 text-ink-muted" />
       </div>
       <div className="bg-white px-3 py-2 space-y-1.5" style={{ minHeight: 70 }}>
-        <div className="h-2 w-full rounded bg-slate-100" />
-        <div className="h-2 w-3/5 rounded bg-slate-100" />
+        <div className="h-2 w-full rounded bg-surface-secondary" />
+        <div className="h-2 w-3/5 rounded bg-surface-secondary" />
       </div>
       {/* Dialog de confirmação Android */}
       <div className="bg-black/40 px-4 py-3">
@@ -437,15 +437,15 @@ function ConfirmMockupAndroid() {
           <div className="flex items-center gap-3">
             <div className="h-12 w-12 rounded-xl bg-green-100 flex items-center justify-center text-xl">🥗</div>
             <div>
-              <p className="text-xs font-semibold text-slate-800">WellNutriAI</p>
-              <p className="text-[10px] text-slate-400">wellnutriai.com</p>
+              <p className="text-xs font-semibold text-ink">WellNutriAI</p>
+              <p className="text-[10px] text-ink-muted">wellnutriai.com</p>
             </div>
           </div>
-          <p className="text-[10px] text-slate-500 leading-relaxed">
+          <p className="text-[10px] text-ink-muted leading-relaxed">
             Adicionar à tela inicial?
           </p>
           <div className="flex justify-end gap-2">
-            <span className="text-[11px] text-slate-500 px-3 py-1.5">Cancelar</span>
+            <span className="text-[11px] text-ink-muted px-3 py-1.5">Cancelar</span>
             <div className="bg-green-600 text-white text-[11px] font-semibold px-3 py-1.5 rounded-lg">
               Adicionar
             </div>

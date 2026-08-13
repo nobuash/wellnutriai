@@ -1,9 +1,25 @@
 import type { Metadata, Viewport } from 'next';
+import { Lora, Manrope } from 'next/font/google';
 import './globals.css';
 import { Providers } from '@/components/Providers';
 
+const lora = Lora({
+  subsets: ['latin'],
+  variable: '--font-display',
+  weight: ['500', '600', '700'],
+  style: ['normal', 'italic'],
+  display: 'swap',
+});
+
+const manrope = Manrope({
+  subsets: ['latin'],
+  variable: '--font-sans',
+  weight: ['400', '500', '600', '700'],
+  display: 'swap',
+});
+
 export const viewport: Viewport = {
-  themeColor: '#16a34a',
+  themeColor: '#3F6B4C',
   width: 'device-width',
   initialScale: 1,
   maximumScale: 1,
@@ -36,7 +52,7 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="pt-BR">
+    <html lang="pt-BR" className={`${lora.variable} ${manrope.variable}`}>
       <body>
         <Providers>{children}</Providers>
       </body>

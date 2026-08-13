@@ -9,6 +9,7 @@ import { createClient } from '@/lib/supabase/client';
 import { formatDate } from '@/lib/utils';
 import type { MealPhotoAnalysis, PhotoAnalysisResult } from '@/types/database';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { Badge } from '@/components/ui/Badge';
 import { Camera, Flame, Plus, Sparkles, Trash2, Upload } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useRef, useState } from 'react';
@@ -152,21 +153,21 @@ export default function PhotoAnalysisPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold flex items-center gap-2">
+        <h1 className="font-display text-2xl text-ink flex items-center gap-2">
           Análise de refeição
-          <span className="text-xs px-2 py-0.5 rounded bg-amber-100 text-amber-700 font-semibold">PRO</span>
+          <Badge variant="warning">PRO</Badge>
         </h1>
-        <p className="text-sm text-slate-500">
+        <p className="text-sm text-ink-muted">
           Estime calorias por foto ou informando os alimentos e gramas manualmente.
         </p>
       </div>
 
       {/* Seletor de modo */}
-      <div className="flex gap-2 p-1 bg-slate-100 rounded-lg w-fit">
+      <div className="flex gap-2 p-1 bg-surface-secondary rounded-lg w-fit">
         <button
           onClick={() => setMode('photo')}
           className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-            mode === 'photo' ? 'bg-white shadow-sm text-slate-900' : 'text-slate-500 hover:text-slate-700'
+            mode === 'photo' ? 'bg-white shadow-sm text-ink' : 'text-ink-muted hover:text-ink-secondary'
           }`}
         >
           <Camera className="h-4 w-4" /> Por foto
@@ -174,7 +175,7 @@ export default function PhotoAnalysisPage() {
         <button
           onClick={() => setMode('manual')}
           className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-            mode === 'manual' ? 'bg-white shadow-sm text-slate-900' : 'text-slate-500 hover:text-slate-700'
+            mode === 'manual' ? 'bg-white shadow-sm text-ink' : 'text-ink-muted hover:text-ink-secondary'
           }`}
         >
           <Sparkles className="h-4 w-4" /> Por gramas
@@ -187,16 +188,16 @@ export default function PhotoAnalysisPage() {
           <div className="space-y-4">
             <div
               onClick={() => fileRef.current?.click()}
-              className="border-2 border-dashed border-slate-300 rounded-xl p-8 text-center cursor-pointer hover:border-brand-400 hover:bg-brand-50/30 transition-colors"
+              className="border-2 border-dashed border-border rounded-md p-8 text-center cursor-pointer hover:border-primary-300 hover:bg-primary-50/30 transition-colors duration-200"
             >
               {preview ? (
                 // eslint-disable-next-line @next/next/no-img-element
-                <img src={preview} alt="preview" className="max-h-64 mx-auto rounded-lg" />
+                <img src={preview} alt="preview" className="max-h-64 mx-auto rounded-sm" />
               ) : (
                 <>
-                  <Upload className="h-10 w-10 text-slate-400 mx-auto mb-3" />
-                  <p className="text-sm text-slate-600 font-medium">Clique para enviar uma foto</p>
-                  <p className="text-xs text-slate-500 mt-1">JPEG, PNG ou WebP (máx 5MB)</p>
+                  <Upload className="h-10 w-10 text-ink-muted mx-auto mb-3" />
+                  <p className="text-sm text-ink-secondary font-medium">Clique para enviar uma foto</p>
+                  <p className="text-xs text-ink-muted mt-1">JPEG, PNG ou WebP (máx 5MB)</p>
                 </>
               )}
             </div>
@@ -214,7 +215,7 @@ export default function PhotoAnalysisPage() {
       {mode === 'manual' && (
         <Card>
           <div className="space-y-4">
-            <p className="text-sm text-slate-600">
+            <p className="text-sm text-ink-secondary">
               Informe cada alimento e a quantidade em gramas para obter uma estimativa calórica.
             </p>
 
@@ -222,7 +223,7 @@ export default function PhotoAnalysisPage() {
               {manualFoods.map((food, i) => (
                 <div key={i} className="flex gap-2 items-end">
                   <div className="flex-1">
-                    {i === 0 && <label className="text-xs text-slate-500 mb-1 block">Alimento</label>}
+                    {i === 0 && <label className="text-xs text-ink-muted mb-1 block">Alimento</label>}
                     <Input
                       placeholder="ex: arroz branco, frango grelhado..."
                       value={food.name}
@@ -230,7 +231,7 @@ export default function PhotoAnalysisPage() {
                     />
                   </div>
                   <div className="w-28">
-                    {i === 0 && <label className="text-xs text-slate-500 mb-1 block">Gramas</label>}
+                    {i === 0 && <label className="text-xs text-ink-muted mb-1 block">Gramas</label>}
                     <Input
                       type="number"
                       placeholder="150"
@@ -242,7 +243,7 @@ export default function PhotoAnalysisPage() {
                   {manualFoods.length > 1 && (
                     <button
                       onClick={() => removeFood(i)}
-                      className="mb-0 p-2 text-slate-400 hover:text-red-500 transition-colors"
+                      className="mb-0 p-2 text-ink-muted hover:text-red-500 transition-colors"
                     >
                       <Trash2 className="h-4 w-4" />
                     </button>
@@ -271,14 +272,14 @@ export default function PhotoAnalysisPage() {
       {/* Resultado */}
       {result && (
         <Card className="animate-slide-up">
-          <h2 className="font-semibold mb-3 flex items-center gap-2">
-            <Camera className="h-4 w-4 text-brand-600" />
+          <h2 className="font-semibold text-ink mb-3 flex items-center gap-2">
+            <Camera className="h-4 w-4 text-primary-600" />
             Resultado da análise
           </h2>
           <div className="space-y-3">
-            <div className="rounded-lg bg-slate-50 p-4">
-              <p className="text-xs text-slate-500 uppercase mb-1">Estimativa total</p>
-              <p className="text-2xl font-bold">{result.total_calories_estimate} kcal</p>
+            <div className="rounded-sm bg-surface-secondary p-4">
+              <p className="text-xs text-ink-muted uppercase tracking-wide mb-1">Estimativa total</p>
+              <p className="text-2xl font-semibold text-ink">{result.total_calories_estimate} kcal</p>
             </div>
 
             <ul className="space-y-2">
@@ -288,13 +289,13 @@ export default function PhotoAnalysisPage() {
                 grams?: number;
                 macros?: { protein_g: number; carbs_g: number; fat_g: number };
               }>).map((f, i) => (
-                <li key={i} className="text-sm border-b border-slate-100 pb-2">
+                <li key={i} className="text-sm border-b border-divider pb-2">
                   <div className="flex justify-between">
-                    <span className="text-slate-700 font-medium">{f.name}</span>
-                    <span className="text-slate-500">~{f.estimated_calories} kcal</span>
+                    <span className="text-ink-secondary font-medium">{f.name}</span>
+                    <span className="text-ink-muted">~{f.estimated_calories} kcal</span>
                   </div>
                   {f.grams !== undefined && (
-                    <div className="flex gap-3 mt-0.5 text-xs text-slate-400">
+                    <div className="flex gap-3 mt-0.5 text-xs text-ink-muted">
                       <span>{f.grams}g</span>
                       {f.macros && (
                         <>
@@ -309,16 +310,16 @@ export default function PhotoAnalysisPage() {
               ))}
             </ul>
 
-            {result.notes && <p className="text-sm text-slate-600">{result.notes}</p>}
+            {result.notes && <p className="text-sm text-ink-secondary">{result.notes}</p>}
             <Disclaimer variant="warning">{result.disclaimer}</Disclaimer>
 
             <button
               onClick={() => addCalorieMutation.mutate()}
               disabled={addedToCalories || addCalorieMutation.isPending}
-              className={`w-full flex items-center justify-center gap-2 rounded-xl py-3 px-4 text-sm font-semibold transition-all ${
+              className={`w-full flex items-center justify-center gap-2 rounded-md py-3 px-4 text-sm font-semibold transition-all duration-200 ${
                 addedToCalories
                   ? 'bg-red-50 text-red-400 cursor-default border border-red-100'
-                  : 'bg-red-500 hover:bg-red-600 active:scale-[0.98] text-white shadow-sm disabled:opacity-60'
+                  : 'bg-red-500 hover:bg-red-600 active:scale-[0.98] text-white shadow-soft disabled:opacity-60'
               }`}
             >
               <Flame className="h-4 w-4" />
@@ -335,22 +336,22 @@ export default function PhotoAnalysisPage() {
       {/* Histórico */}
       {history.length > 0 && (
         <div>
-          <h2 className="font-semibold mb-3">Histórico</h2>
+          <h2 className="font-semibold text-ink mb-3">Histórico</h2>
           <div className="space-y-2">
             {history.map((h) => (
               <Card key={h.id} className="flex items-center justify-between">
                 <div>
-                  <p className="font-medium text-sm">
+                  <p className="font-medium text-sm text-ink">
                     {(h.result as PhotoAnalysisResult).total_calories_estimate} kcal estimadas
                   </p>
-                  <p className="text-xs text-slate-500">{formatDate(h.created_at)}</p>
+                  <p className="text-xs text-ink-muted">{formatDate(h.created_at)}</p>
                 </div>
                 <div className="text-right">
-                  <p className="text-xs text-slate-500">
+                  <p className="text-xs text-ink-muted">
                     {(h.result as PhotoAnalysisResult).foods.length} alimentos
                   </p>
                   {h.image_url === 'manual' && (
-                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-100 text-slate-500">manual</span>
+                    <Badge variant="neutral" className="mt-1">manual</Badge>
                   )}
                 </div>
               </Card>

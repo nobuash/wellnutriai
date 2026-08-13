@@ -2,11 +2,18 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Fonte da verdade: DESIGN.md — redesign visual v2. */
 @layer base {
   html {
-    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    font-family: var(--font-sans), system-ui, -apple-system, sans-serif;
   }
   body {
-    @apply bg-slate-50 text-slate-900 antialiased;
+    @apply bg-background text-ink antialiased;
+  }
+  ::selection {
+    @apply bg-primary-200 text-primary-900;
+  }
+  :focus-visible {
+    @apply outline-none ring-2 ring-primary-500 ring-offset-2 ring-offset-background;
   }
 }

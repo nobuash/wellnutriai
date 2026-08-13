@@ -1,11 +1,21 @@
 import { cn } from '@/lib/utils';
 import type { HTMLAttributes } from 'react';
 
-export function Card({ className, ...rest }: HTMLAttributes<HTMLDivElement>) {
+interface Props extends HTMLAttributes<HTMLDivElement> {
+  /**
+   * Sombra sutil e tingida, pra quando a elevação comunica hierarquia
+   * de verdade (ex: item destacado, popover). Padrão é só borda — ver
+   * DESIGN.md ("cards só quando elevação comunica hierarquia").
+   */
+  elevated?: boolean;
+}
+
+export function Card({ className, elevated, ...rest }: Props) {
   return (
     <div
       className={cn(
-        'rounded-xl border border-slate-200 bg-white p-6 shadow-sm',
+        'rounded-md border border-border bg-surface p-6',
+        elevated && 'shadow-soft',
         className
       )}
       {...rest}

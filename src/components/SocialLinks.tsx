@@ -17,7 +17,7 @@ export function SocialLinks({ className = '' }: { className?: string }) {
         target="_blank"
         rel="noopener noreferrer"
         aria-label="Instagram WellNutriAI"
-        className="text-slate-400 hover:text-pink-500 transition-colors"
+        className="text-ink-muted hover:text-pink-500 transition-colors duration-200"
       >
         <Instagram className="h-5 w-5" />
       </Link>
@@ -26,7 +26,7 @@ export function SocialLinks({ className = '' }: { className?: string }) {
         target="_blank"
         rel="noopener noreferrer"
         aria-label="TikTok WellNutriAI"
-        className="text-slate-400 hover:text-slate-700 transition-colors"
+        className="text-ink-muted hover:text-ink-secondary transition-colors duration-200"
       >
         <TikTokIcon className="h-5 w-5" />
       </Link>

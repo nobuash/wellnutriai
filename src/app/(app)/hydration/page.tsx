@@ -132,8 +132,8 @@ export default function HydrationPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold">Hidratação</h1>
-        <p className="text-sm text-slate-500">Acompanhe sua ingestão de água diária.</p>
+        <h1 className="font-display text-2xl text-ink">Hidratação</h1>
+        <p className="text-sm text-ink-muted mt-1">Acompanhe sua ingestão de água diária.</p>
       </div>
 
       {/* Card principal */}
@@ -141,10 +141,10 @@ export default function HydrationPage() {
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
             <Droplets className="h-5 w-5 text-blue-500" />
-            <span className="font-semibold text-slate-700">Hoje</span>
+            <span className="font-semibold text-ink-secondary">Hoje</span>
           </div>
           <div className="flex items-center gap-3">
-            <span className="text-sm text-slate-500">Meta: {formatMl(goalMl)}</span>
+            <span className="text-sm text-ink-muted">Meta: {formatMl(goalMl)}</span>
             {logs.length > 0 && (
               <button
                 onClick={() => resetMutation.mutate()}
@@ -159,14 +159,14 @@ export default function HydrationPage() {
 
         {/* Valor total */}
         <div className="text-center mb-4">
-          <p className="text-5xl font-bold text-blue-600">{formatMl(totalMl)}</p>
-          <p className="text-sm text-slate-400 mt-1">{percent}% da meta atingida</p>
+          <p className="font-display text-5xl text-blue-600">{formatMl(totalMl)}</p>
+          <p className="text-sm text-ink-muted mt-1">{percent}% da meta atingida</p>
         </div>
 
         {/* Barra de progresso */}
-        <div className="w-full bg-slate-100 rounded-full h-4 mb-6 overflow-hidden">
+        <div className="w-full bg-surface-secondary rounded-full h-3 mb-6 overflow-hidden">
           <div
-            className="h-4 rounded-full bg-gradient-to-r from-blue-400 to-blue-600 transition-all duration-500"
+            className="h-3 rounded-full bg-blue-500 transition-all duration-500"
             style={{ width: `${Math.min(100, percent)}%` }}
           />
         </div>
@@ -178,7 +178,7 @@ export default function HydrationPage() {
               key={ml}
               onClick={() => handleAdd(ml)}
               disabled={addMutation.isPending}
-              className="flex flex-col items-center gap-1 p-3 rounded-xl border border-blue-100 bg-blue-50 hover:bg-blue-100 active:scale-95 transition-all disabled:opacity-50"
+              className="flex flex-col items-center gap-1 p-3 rounded-md border border-blue-100 bg-blue-50 hover:bg-blue-100 active:scale-[0.97] transition-all duration-200 disabled:opacity-50"
             >
               <Droplets className="h-5 w-5 text-blue-500" />
               <span className="text-xs font-semibold text-blue-700">+{formatMl(ml)}</span>
@@ -186,10 +186,10 @@ export default function HydrationPage() {
           ))}
           <button
             onClick={() => setShowCustom((v) => !v)}
-            className="flex flex-col items-center gap-1 p-3 rounded-xl border border-slate-200 bg-slate-50 hover:bg-slate-100 active:scale-95 transition-all"
+            className="flex flex-col items-center gap-1 p-3 rounded-md border border-border bg-surface-secondary hover:bg-border/40 active:scale-[0.97] transition-all duration-200"
           >
-            <Plus className="h-5 w-5 text-slate-500" />
-            <span className="text-xs font-semibold text-slate-600">Outro</span>
+            <Plus className="h-5 w-5 text-ink-muted" />
+            <span className="text-xs font-semibold text-ink-secondary">Outro</span>
           </button>
         </div>
 
@@ -204,9 +204,9 @@ export default function HydrationPage() {
               value={customInput}
               onChange={(e) => setCustomInput(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && handleCustomAdd()}
-              className="flex-1 border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+              className="flex-1 border border-border rounded-sm px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
             />
-            <span className="self-center text-sm text-slate-500">ml</span>
+            <span className="self-center text-sm text-ink-muted">ml</span>
             <Button size="sm" onClick={handleCustomAdd} loading={addMutation.isPending}>
               Adicionar
             </Button>
@@ -216,25 +216,25 @@ export default function HydrationPage() {
 
       {/* Registros do dia */}
       <div>
-        <h2 className="text-sm font-semibold text-slate-500 mb-3 uppercase tracking-wide">Registros de hoje</h2>
+        <h2 className="text-sm font-semibold text-ink-muted mb-3 uppercase tracking-wide">Registros de hoje</h2>
         {logs.length === 0 ? (
-          <p className="text-sm text-slate-400 text-center py-6">Nenhum registro ainda. Beba água! 💧</p>
+          <p className="text-sm text-ink-muted text-center py-6">Nenhum registro ainda. Beba água! 💧</p>
         ) : (
           <div className="space-y-2">
             {logs.map((log) => (
               <div
                 key={log.id}
-                className="flex items-center justify-between bg-white border border-slate-100 rounded-xl px-4 py-3 shadow-sm"
+                className="flex items-center justify-between bg-surface border border-divider rounded-md px-4 py-3 shadow-soft"
               >
                 <div className="flex items-center gap-3">
                   <Droplets className="h-4 w-4 text-blue-400" />
                   <span className="font-semibold text-blue-700">{formatMl(log.amount_ml)}</span>
                 </div>
                 <div className="flex items-center gap-3">
-                  <span className="text-xs text-slate-400">{formatTime(log.logged_at)}</span>
+                  <span className="text-xs text-ink-muted">{formatTime(log.logged_at)}</span>
                   <button
                     onClick={() => deleteMutation.mutate(log.id)}
-                    className="text-slate-300 hover:text-red-400 transition-colors"
+                    className="text-ink-muted/60 hover:text-red-500 transition-colors"
                   >
                     <Trash2 className="h-4 w-4" />
                   </button>
@@ -247,7 +247,7 @@ export default function HydrationPage() {
 
       {/* Info da meta */}
       {goalMl === DEFAULT_GOAL_ML && (
-        <p className="text-xs text-slate-400 text-center">
+        <p className="text-xs text-ink-muted text-center">
           Meta baseada no padrão de 2L/dia. Gere um plano alimentar para receber uma meta personalizada.
         </p>
       )}

@@ -52,16 +52,16 @@ export function CardPaymentModal({ planInterval, onClose }: Props) {
   }
 
   return (
-    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl p-6 max-w-md w-full shadow-xl max-h-[90vh] overflow-y-auto">
+    <div className="fixed inset-0 bg-ink/50 z-50 flex items-center justify-center p-4">
+      <div className="bg-surface rounded-lg p-6 max-w-md w-full shadow-soft-lg max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between mb-4">
           <div>
-            <h2 className="text-lg font-bold">Pagamento via Cartão</h2>
-            <p className="text-sm text-slate-500">
+            <h2 className="font-display text-lg text-ink">Pagamento via Cartão</h2>
+            <p className="text-sm text-ink-muted">
               {plan.displayLabel} · R$ {plan.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
             </p>
           </div>
-          <button onClick={onClose} className="text-slate-400 hover:text-slate-600 p-1">
+          <button onClick={onClose} className="text-ink-muted hover:text-ink-secondary p-1 transition-colors duration-200">
             <X className="h-5 w-5" />
           </button>
         </div>

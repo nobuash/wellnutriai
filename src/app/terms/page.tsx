@@ -80,7 +80,7 @@ export default function TermsPage() {
       <h2>7. Privacidade</h2>
       <p>
         O tratamento de dados pessoais está descrito na nossa{' '}
-        <a href="/privacy" className="text-brand-600 underline">
+        <a href="/privacy" className="text-primary-600 underline">
           Política de Privacidade
         </a>
         .

@@ -55,11 +55,11 @@ export function MobileInstallPrompt() {
 
       {/* Bottom sheet */}
       <div className="fixed bottom-0 left-0 right-0 z-50 animate-slide-up">
-        <div className="bg-white rounded-t-2xl shadow-xl p-6 mx-auto max-w-md">
+        <div className="bg-surface rounded-t-lg shadow-soft-lg p-6 mx-auto max-w-md">
           {/* Close button */}
           <button
             onClick={handleDismiss}
-            className="absolute top-4 right-4 p-1 rounded-full text-slate-400 hover:bg-slate-100"
+            className="absolute top-4 right-4 p-1 rounded-full text-ink-muted hover:bg-surface-secondary transition-colors duration-200"
             aria-label="Fechar"
           >
             <X className="h-5 w-5" />
@@ -67,33 +67,33 @@ export function MobileInstallPrompt() {
 
           {/* Icon + title */}
           <div className="flex items-center gap-3 mb-3">
-            <div className="w-12 h-12 rounded-xl bg-brand-50 flex items-center justify-center shrink-0">
-              <Smartphone className="h-6 w-6 text-brand-600" />
+            <div className="w-12 h-12 rounded-md bg-primary-50 flex items-center justify-center shrink-0">
+              <Smartphone className="h-6 w-6 text-primary-600" strokeWidth={1.75} />
             </div>
             <div>
-              <p className="font-semibold text-slate-800 text-base leading-tight">
+              <p className="font-semibold text-ink text-base leading-tight">
                 Instale o WellNutriAI
               </p>
-              <p className="text-xs text-slate-500 mt-0.5">
+              <p className="text-xs text-ink-muted mt-0.5">
                 Acesse mais rápido direto da tela inicial
               </p>
             </div>
           </div>
 
-          <p className="text-sm text-slate-600 mb-5">
+          <p className="text-sm text-ink-secondary mb-5">
             Deseja adicionar o aplicativo à tela inicial do seu celular para uma experiência completa?
           </p>
 
           <div className="flex flex-col gap-2">
             <button
               onClick={handleInstall}
-              className="w-full py-3 rounded-xl bg-brand-600 hover:bg-brand-700 text-white font-semibold text-sm transition-colors"
+              className="w-full py-3 rounded-md bg-primary-600 hover:bg-primary-700 text-white font-semibold text-sm transition-colors duration-200"
             >
               Instalar aplicativo
             </button>
             <button
               onClick={handleDismiss}
-              className="w-full py-2.5 rounded-xl text-slate-500 hover:bg-slate-100 font-medium text-sm transition-colors"
+              className="w-full py-2.5 rounded-md text-ink-muted hover:bg-surface-secondary font-medium text-sm transition-colors duration-200"
             >
               Agora não
             </button>

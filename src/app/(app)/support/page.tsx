@@ -57,9 +57,9 @@ export default function SupportPage() {
   if (sent) {
     return (
       <Card className="max-w-lg mx-auto text-center py-12">
-        <CheckCircle className="h-12 w-12 text-green-500 mx-auto mb-4" />
-        <h2 className="text-xl font-bold mb-2">Mensagem enviada!</h2>
-        <p className="text-slate-500 mb-6">
+        <CheckCircle className="h-12 w-12 text-primary-600 mx-auto mb-4" />
+        <h2 className="font-display text-xl text-ink mb-2">Mensagem enviada!</h2>
+        <p className="text-ink-muted mb-6">
           Recebemos sua mensagem e responderemos em breve no e-mail informado.
         </p>
         <Button onClick={() => setSent(false)}>Enviar outra mensagem</Button>
@@ -70,14 +70,14 @@ export default function SupportPage() {
   return (
     <div className="space-y-6 max-w-lg">
       <div>
-        <h1 className="text-2xl font-bold">Suporte</h1>
-        <p className="text-sm text-slate-500">Estamos aqui para ajudar. Descreva sua dúvida ou problema.</p>
+        <h1 className="font-display text-2xl text-ink">Suporte</h1>
+        <p className="text-sm text-ink-muted mt-1">Estamos aqui para ajudar. Descreva sua dúvida ou problema.</p>
       </div>
 
       <Card>
-        <div className="flex items-center gap-3 mb-6 p-3 rounded-lg bg-brand-50">
-          <HeadphonesIcon className="h-5 w-5 text-brand-600 shrink-0" />
-          <p className="text-sm text-brand-700">
+        <div className="flex items-center gap-3 mb-6 p-3 rounded-md bg-primary-50">
+          <HeadphonesIcon className="h-5 w-5 text-primary-600 shrink-0" />
+          <p className="text-sm text-primary-700">
             Nossa equipe responde em até <strong>24 horas</strong> nos dias úteis.
           </p>
         </div>
@@ -99,7 +99,7 @@ export default function SupportPage() {
             error={errors.email?.message}
           />
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">
+            <label className="block text-sm font-medium text-ink-secondary mb-1">
               Como podemos ajudar?
             </label>
             <textarea
@@ -109,10 +109,10 @@ export default function SupportPage() {
               })}
               rows={5}
               placeholder="Descreva sua dúvida ou problema em detalhes..."
-              className="w-full px-3 py-2 rounded-lg border border-slate-300 text-sm focus:ring-2 focus:ring-brand-500 focus:outline-none resize-none"
+              className="w-full px-3 py-2 rounded-sm border border-border text-sm focus:ring-2 focus:ring-primary-500 focus:outline-none resize-none"
             />
             {errors.message && (
-              <p className="text-xs text-red-600 mt-1">{errors.message.message}</p>
+              <p className="text-xs text-error mt-1">{errors.message.message}</p>
             )}
           </div>
           <Button type="submit" className="w-full" loading={isSubmitting}>

@@ -40,13 +40,13 @@ function ConfirmResetPasswordForm() {
 
   if (!tokenHash || error) {
     return (
-      <Card className="animate-slide-up">
-        <h1 className="text-2xl font-bold mb-1">Link inválido ou expirado</h1>
-        <p className="text-sm text-slate-500">
+      <Card className="animate-slide-up p-8">
+        <h1 className="font-display text-2xl text-ink mb-1.5">Link inválido ou expirado</h1>
+        <p className="text-sm text-ink-muted">
           Esse link de redefinição de senha não é mais válido. Solicite um novo.
         </p>
-        <p className="text-sm text-center text-slate-600 mt-6">
-          <Link href="/forgot-password" className="text-brand-600 font-medium hover:underline">
+        <p className="text-sm text-center text-ink-secondary mt-6">
+          <Link href="/forgot-password" className="text-primary-600 font-medium hover:underline">
             Solicitar novo link
           </Link>
         </p>
@@ -55,9 +55,9 @@ function ConfirmResetPasswordForm() {
   }
 
   return (
-    <Card className="animate-slide-up">
-      <h1 className="text-2xl font-bold mb-1">Redefinir senha</h1>
-      <p className="text-sm text-slate-500 mb-6">
+    <Card className="animate-slide-up p-8">
+      <h1 className="font-display text-2xl text-ink mb-1.5">Redefinir senha</h1>
+      <p className="text-sm text-ink-muted mb-6">
         Clique no botão abaixo para continuar e escolher sua nova senha.
       </p>
       <Button className="w-full" loading={loading} onClick={handleConfirm}>
