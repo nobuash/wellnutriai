@@ -25,6 +25,14 @@ const INTERVAL_LABELS: Record<PlanInterval, string> = {
   annual: 'Anual',
 };
 
+// Calculado no build (next.config.js) a partir da presença real de
+// MP_ACCESS_TOKEN/MP_WEBHOOK_SECRET/NEXT_PUBLIC_MP_PUBLIC_KEY — a
+// conta do Mercado Pago pode não estar habilitada pra receber
+// pagamentos ainda (verificação/dados bancários pendentes junto ao
+// próprio Mercado Pago), então o botão de PIX não pode aparecer
+// oferecendo um método que vai falhar.
+const MERCADOPAGO_ENABLED = process.env.NEXT_PUBLIC_MERCADOPAGO_ENABLED === 'true';
+
 function formatBRL(value: number) {
   return value.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
@@ -227,26 +235,30 @@ export default function PricingPage() {
               <Button className="w-full" variant="outline" onClick={() => setShowCardModal(true)}>
                 <CreditCard className="h-4 w-4 mr-2" /> Renovar via Cartão
               </Button>
-              <Button
-                className="w-full" variant="outline"
-                loading={pixMutation.isPending}
-                onClick={() => pixMutation.mutate(selectedInterval)}
-              >
-                <QrCode className="h-4 w-4 mr-2" /> Renovar via PIX
-              </Button>
+              {MERCADOPAGO_ENABLED && (
+                <Button
+                  className="w-full" variant="outline"
+                  loading={pixMutation.isPending}
+                  onClick={() => pixMutation.mutate(selectedInterval)}
+                >
+                  <QrCode className="h-4 w-4 mr-2" /> Renovar via PIX
+                </Button>
+              )}
             </div>
           ) : (
             <div className="space-y-3">
               <Button className="w-full" onClick={() => setShowCardModal(true)}>
                 <CreditCard className="h-4 w-4 mr-2" /> Pagar via Cartão
               </Button>
-              <Button
-                className="w-full" variant="outline"
-                loading={pixMutation.isPending}
-                onClick={() => pixMutation.mutate(selectedInterval)}
-              >
-                <QrCode className="h-4 w-4 mr-2" /> Pagar via PIX
-              </Button>
+              {MERCADOPAGO_ENABLED && (
+                <Button
+                  className="w-full" variant="outline"
+                  loading={pixMutation.isPending}
+                  onClick={() => pixMutation.mutate(selectedInterval)}
+                >
+                  <QrCode className="h-4 w-4 mr-2" /> Pagar via PIX
+                </Button>
+              )}
             </div>
           )}
         </Card>
@@ -314,9 +326,18 @@ export default function PricingPage() {
         <div className="flex gap-3 items-start text-sm text-ink-secondary">
           <AlertCircle className="h-4 w-4 shrink-0 mt-0.5 text-ink-muted" />
           <p>
-            O pagamento é processado com segurança pelo <strong className="text-ink">Mercado Pago</strong> ou pela{' '}
-            <strong className="text-ink">Stripe</strong> (cartão internacional). Não armazenamos dados do seu cartão. O PIX ativa
-            o PRO pelo período escolhido e pode ser renovado a qualquer momento.
+            {MERCADOPAGO_ENABLED ? (
+              <>
+                O pagamento é processado com segurança pelo <strong className="text-ink">Mercado Pago</strong> ou pela{' '}
+                <strong className="text-ink">Stripe</strong> (cartão internacional). Não armazenamos dados do seu cartão. O PIX ativa
+                o PRO pelo período escolhido e pode ser renovado a qualquer momento.
+              </>
+            ) : (
+              <>
+                O pagamento é processado com segurança pela <strong className="text-ink">Stripe</strong>.
+                Não armazenamos dados do seu cartão.
+              </>
+            )}
           </p>
         </div>
       </Card>

@@ -14,6 +14,14 @@ export async function POST(req: Request) {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: 'Não autenticado' }, { status: 401 });
 
+  // Conta do Mercado Pago pode não estar habilitada pra receber
+  // pagamentos ainda — o botão de PIX já fica oculto na UI nesse caso
+  // (ver next.config.js / NEXT_PUBLIC_MERCADOPAGO_ENABLED), isso aqui é
+  // só a mesma checagem no servidor pra quem chamar a rota direto.
+  if (!process.env.MP_ACCESS_TOKEN) {
+    return NextResponse.json({ error: 'Pagamento via PIX indisponível no momento.' }, { status: 503 });
+  }
+
   // Rate limit distribuído: 10 tentativas de gerar PIX por hora por usuário
   if (!(await checkDistributedRateLimit(`payment-pix:${user.id}`, 10, 3600))) {
     return NextResponse.json({ error: 'Muitas tentativas. Tente novamente em breve.' }, { status: 429 });

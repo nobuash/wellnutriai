@@ -141,10 +141,10 @@ const nextConfig = {
 // ausente na Vercel e o build passou normal — só quebrou em runtime,
 // no momento em que um usuário clicava em "Pagar via Cartão"
 // ("Expected publishable key to be of type string, got type undefined
-// instead."). As variáveis do Stripe e do Mercado Pago abaixo nunca
-// tinham sido validadas no build, só usadas com `!` (non-null
-// assertion) direto no código — cada uma dessas é exatamente o tipo
-// de ausência que essa checagem existe pra pegar cedo.
+// instead."). As variáveis do Stripe abaixo nunca tinham sido
+// validadas no build, só usadas com `!` (non-null assertion) direto
+// no código — cada uma dessas é exatamente o tipo de ausência que
+// essa checagem existe pra pegar cedo.
 const REQUIRED_ENV_VARS = [
   'NEXT_PUBLIC_SUPABASE_URL',
   'NEXT_PUBLIC_SUPABASE_ANON_KEY',
@@ -156,9 +156,6 @@ const REQUIRED_ENV_VARS = [
   'STRIPE_PRICE_MONTHLY',
   'STRIPE_PRICE_QUARTERLY',
   'STRIPE_PRICE_ANNUAL',
-  'MP_ACCESS_TOKEN',
-  'MP_WEBHOOK_SECRET',
-  'NEXT_PUBLIC_MP_PUBLIC_KEY',
 ];
 
 const missingEnvVars = REQUIRED_ENV_VARS.filter((key) => !process.env[key]);
@@ -168,5 +165,28 @@ if (missingEnvVars.length > 0) {
     'Configure-as (ver .env.example) antes de rodar build/deploy.'
   );
 }
+
+// Mercado Pago NÃO é obrigatório pro build — CONFIRMADO que a ativação
+// de produção da conta (dados bancários/verificação junto ao próprio
+// Mercado Pago) é um processo à parte, fora do controle de quem faz o
+// deploy, e não pode travar o build inteiro (Stripe incluso) enquanto
+// isso não termina. Em vez de falhar o build, calcula se o Mercado
+// Pago está disponível e expõe isso pro cliente via
+// NEXT_PUBLIC_MERCADOPAGO_ENABLED — src/app/(app)/pricing/page.tsx usa
+// essa flag pra esconder os botões de PIX em vez de oferecer um método
+// de pagamento que vai falhar.
+const MP_ENV_VARS = ['MP_ACCESS_TOKEN', 'MP_WEBHOOK_SECRET', 'NEXT_PUBLIC_MP_PUBLIC_KEY'];
+const missingMpVars = MP_ENV_VARS.filter((key) => !process.env[key]);
+const mercadoPagoEnabled = missingMpVars.length === 0;
+if (!mercadoPagoEnabled) {
+  console.warn(
+    `[next.config.js] Mercado Pago desabilitado neste build — variáveis ausentes: ${missingMpVars.join(', ')}. ` +
+    'PIX ficará indisponível na interface até configurá-las.'
+  );
+}
+
+nextConfig.env = {
+  NEXT_PUBLIC_MERCADOPAGO_ENABLED: String(mercadoPagoEnabled),
+};
 
 module.exports = withPWA(nextConfig);

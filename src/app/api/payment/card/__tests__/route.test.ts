@@ -64,11 +64,17 @@ function buildRequest(body: unknown): Request {
 
 describe('POST /api/payment/card', () => {
   beforeEach(() => {
+    // Rota agora falha cedo (503) se MP_ACCESS_TOKEN não estiver
+    // configurado — ver next.config.js / src/app/api/payment/card/route.ts.
+    // Esses testes cobrem a lógica de pagamento assumindo MP configurado,
+    // não essa checagem, então precisam do env var presente.
+    process.env.MP_ACCESS_TOKEN = 'TEST-mock-access-token';
     activateMpPaymentMock.mockReset();
     createPaymentMock.mockReset();
   });
 
   afterEach(() => {
+    delete process.env.MP_ACCESS_TOKEN;
     vi.resetModules();
   });
 
@@ -106,6 +112,17 @@ describe('POST /api/payment/card', () => {
 
     expect(res.status).toBe(200);
     expect(json.status).toBe('rejected');
+    expect(activateMpPaymentMock).not.toHaveBeenCalled();
+  });
+
+  it('retorna 503 sem chamar o Mercado Pago quando MP_ACCESS_TOKEN não está configurado', async () => {
+    delete process.env.MP_ACCESS_TOKEN;
+
+    const { POST } = await import('@/app/api/payment/card/route');
+    const res = await POST(buildRequest(buildBody()));
+
+    expect(res.status).toBe(503);
+    expect(createPaymentMock).not.toHaveBeenCalled();
     expect(activateMpPaymentMock).not.toHaveBeenCalled();
   });
 });
