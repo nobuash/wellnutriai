@@ -1,7 +1,9 @@
 import { Card } from '@/components/ui/Card';
 import { CalorieWidget } from '@/components/CalorieWidget';
 import { HydrationWidget } from '@/components/HydrationWidget';
+import { StreakBadge } from '@/components/StreakBadge';
 import { createClient, getCachedUser } from '@/lib/supabase/server';
+import { getEffectiveStreak } from '@/lib/streak';
 import { formatDate } from '@/lib/utils';
 import { Camera, ClipboardList, Lock, MessageCircle, Sparkles, Utensils } from 'lucide-react';
 import Link from 'next/link';
@@ -53,7 +55,11 @@ export default async function DashboardPage() {
       .order('created_at', { ascending: false })
       .limit(1)
       .maybeSingle() as unknown as Promise<{ data: MealPlan | null }>,
-    supabase.from('profiles').select('name, plan').eq('id', user!.id).single(),
+    supabase
+      .from('profiles')
+      .select('name, plan, current_streak_days, last_meal_logged_date')
+      .eq('id', user!.id)
+      .single(),
     supabase
       .from('subscriptions')
       .select('expires_at, next_payment_date, payment_type, mp_status')
@@ -77,11 +83,19 @@ export default async function DashboardPage() {
 
   const isRecurring = subscription?.payment_type === 'subscription';
 
+  const streak = getEffectiveStreak({
+    lastMealLoggedDate: profile?.last_meal_logged_date ?? null,
+    currentStreakDays: profile?.current_streak_days ?? 0,
+  });
+
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="font-display text-3xl text-ink">Olá, {profile?.name?.split(' ')[0] || 'bem-vindo'}!</h1>
-        <p className="text-ink-muted mt-1">Aqui está um resumo da sua jornada nutricional.</p>
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h1 className="font-display text-3xl text-ink">Olá, {profile?.name?.split(' ')[0] || 'bem-vindo'}!</h1>
+          <p className="text-ink-muted mt-1">Aqui está um resumo da sua jornada nutricional.</p>
+        </div>
+        <StreakBadge days={streak.days} loggedToday={streak.loggedToday} />
       </div>
 
       {/* Cards de resumo */}
