@@ -1,6 +1,6 @@
 import { createServiceClient } from '@/lib/supabase/service';
 
-export type AiFeature = 'meal_plan' | 'chat' | 'photo_analysis' | 'photo_analysis_manual' | 'embedding';
+export type AiFeature = 'meal_plan' | 'chat' | 'photo_analysis' | 'photo_analysis_manual' | 'meal_comment' | 'embedding';
 
 // Preços aproximados (USD por 1M tokens) — VERIFICAR contra a página de
 // pricing atual da OpenAI periodicamente, isso muda com frequência e

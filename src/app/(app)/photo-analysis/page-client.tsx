@@ -3,28 +3,18 @@
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { Disclaimer } from '@/components/ui/Disclaimer';
-import { Input } from '@/components/ui/Input';
 import { addCalorieLog } from '@/components/CalorieWidget';
 import { createClient } from '@/lib/supabase/client';
 import { formatDate } from '@/lib/utils';
-import type { MealPhotoAnalysis, PhotoAnalysisResult } from '@/types/database';
+import type { MealPhotoAnalysis, NaoIdentificado, NutritionAnalysisItem, NutritionAnalysisResult } from '@/types/database';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Badge } from '@/components/ui/Badge';
-import { Camera, Flame, Plus, Sparkles, Trash2, Upload } from 'lucide-react';
+import { Camera, Flame, Sparkles, Upload } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useRef, useState } from 'react';
 import { toast } from 'sonner';
 
-type Mode = 'photo' | 'manual';
-
-interface ManualFood { name: string; grams: string }
-
-interface ManualResult {
-  foods: Array<{ name: string; grams: number; estimated_calories: number; macros?: { protein_g: number; carbs_g: number; fat_g: number } }>;
-  total_calories_estimate: number;
-  notes: string;
-  disclaimer: string;
-}
+type Mode = 'photo' | 'text';
 
 export default function PhotoAnalysisPage() {
   const supabase = createClient();
@@ -34,8 +24,10 @@ export default function PhotoAnalysisPage() {
 
   const [mode, setMode] = useState<Mode>('photo');
   const [preview, setPreview] = useState<string | null>(null);
-  const [file, setFile] = useState<File | null>(null);
-  const [manualFoods, setManualFoods] = useState<ManualFood[]>([{ name: '', grams: '' }]);
+  const [textInput, setTextInput] = useState('');
+  const [result, setResult] = useState<NutritionAnalysisResult | null>(null);
+  const [pendingIndexes, setPendingIndexes] = useState<Set<number>>(new Set());
+  const [resolvedItems, setResolvedItems] = useState<NutritionAnalysisItem[]>([]);
   const [addedToCalories, setAddedToCalories] = useState(false);
   const today = new Date().toISOString().split('T')[0];
 
@@ -54,43 +46,19 @@ export default function PhotoAnalysisPage() {
     },
   });
 
-  // Análise por foto
-  const analyzePhoto = useMutation({
-    mutationFn: async (f: File) => {
-      const form = new FormData();
-      form.append('image', f);
-      const res = await fetch('/api/photo-analysis', { method: 'POST', body: form });
-      const data = await res.json();
-      if (!res.ok) {
-        if (data.upgrade) toast.error(data.error, { action: { label: 'Upgrade', onClick: () => router.push('/pricing') } });
-        else toast.error(data.error || 'Erro na análise');
-        throw new Error(data.error);
-      }
-      return data.result as PhotoAnalysisResult;
-    },
-    onSuccess: () => {
-      toast.success('Análise concluída!');
-      qc.invalidateQueries({ queryKey: ['photo-history'] });
-      setAddedToCalories(false);
-      setFile(null);
-      setPreview(null);
-      if (fileRef.current) fileRef.current.value = '';
-    },
-  });
+  function resetResult(newResult: NutritionAnalysisResult) {
+    setResult(newResult);
+    setPendingIndexes(new Set(newResult.nao_identificados.map((_, i) => i)));
+    setResolvedItems([]);
+    setAddedToCalories(false);
+  }
 
-  // Análise manual por gramas
-  const analyzeManual = useMutation({
-    mutationFn: async (foods: ManualFood[]) => {
-      const payload = foods
-        .filter((f) => f.name.trim() && f.grams)
-        .map((f) => ({ name: f.name.trim(), grams: parseFloat(f.grams) }));
-
-      if (payload.length === 0) throw new Error('Informe pelo menos um alimento');
-
-      const res = await fetch('/api/photo-analysis/manual', {
+  const analyze = useMutation({
+    mutationFn: async (body: { mode: 'photo'; image: string } | { mode: 'text'; input: string }) => {
+      const res = await fetch('/api/nutrition/analyze', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ foods: payload }),
+        body: JSON.stringify(body),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -98,24 +66,60 @@ export default function PhotoAnalysisPage() {
         else toast.error(data.error || 'Erro na análise');
         throw new Error(data.error);
       }
-      return data.result as ManualResult;
+      return data.result as NutritionAnalysisResult;
     },
-    onSuccess: () => {
+    onSuccess: (newResult) => {
       toast.success('Análise concluída!');
       qc.invalidateQueries({ queryKey: ['photo-history'] });
-      setAddedToCalories(false);
+      resetResult(newResult);
+      if (mode === 'photo') {
+        setPreview(null);
+        if (fileRef.current) fileRef.current.value = '';
+      } else {
+        setTextInput('');
+      }
     },
   });
+
+  // Resolve um item de nao_identificados contra um candidato escolhido
+  // — sem chamar o LLM de novo (ver src/app/api/nutrition/resolve).
+  const resolve = useMutation({
+    mutationFn: async ({ tacoId, gramas }: { tacoId: string; gramas: number }) => {
+      const res = await fetch('/api/nutrition/resolve', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ items: [{ tacoId, gramas }] }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Erro ao resolver alimento');
+      return data as { itens: NutritionAnalysisItem[] };
+    },
+    onError: () => toast.error('Erro ao resolver alimento'),
+  });
+
+  function handleResolve(index: number, tacoId: string, gramas: number) {
+    resolve.mutate(
+      { tacoId, gramas },
+      {
+        onSuccess: (data) => {
+          setResolvedItems((prev) => [...prev, ...data.itens]);
+          setPendingIndexes((prev) => {
+            const next = new Set(prev);
+            next.delete(index);
+            return next;
+          });
+        },
+      },
+    );
+  }
 
   // Adicionar resultado à meta de calorias diária
   const addCalorieMutation = useMutation({
     mutationFn: async () => {
       if (!result) throw new Error('Sem resultado');
-      const description = result.foods
-        .map((f) => f.name)
-        .join(', ')
-        .slice(0, 120);
-      await addCalorieLog(supabase, result.total_calories_estimate, description);
+      const allItems = [...result.itens, ...resolvedItems];
+      const description = allItems.map((f) => f.nome).join(', ').slice(0, 120);
+      await addCalorieLog(supabase, totalKcal, description);
     },
     onSuccess: () => {
       setAddedToCalories(true);
@@ -129,26 +133,17 @@ export default function PhotoAnalysisPage() {
     const f = e.target.files?.[0];
     if (!f) return;
     if (f.size > 5 * 1024 * 1024) { toast.error('Imagem muito grande (máx 5MB)'); return; }
-    setFile(f);
     const reader = new FileReader();
     reader.onload = () => setPreview(reader.result as string);
     reader.readAsDataURL(f);
   }
 
-  function addFood() {
-    setManualFoods((prev) => [...prev, { name: '', grams: '' }]);
-  }
-
-  function removeFood(i: number) {
-    setManualFoods((prev) => prev.filter((_, idx) => idx !== i));
-  }
-
-  function updateFood(i: number, field: keyof ManualFood, value: string) {
-    setManualFoods((prev) => prev.map((f, idx) => idx === i ? { ...f, [field]: value } : f));
-  }
-
-  const result = mode === 'photo' ? analyzePhoto.data : analyzeManual.data;
-  const isPending = mode === 'photo' ? analyzePhoto.isPending : analyzeManual.isPending;
+  const totalKcal = (result?.totais.kcal ?? 0) + resolvedItems.reduce((s, i) => s + i.kcal, 0);
+  const allDisplayItems = result ? [...result.itens, ...resolvedItems] : [];
+  const hasEstimated = allDisplayItems.some((i) => i.estimado);
+  const pendingNaoIdentificados: Array<[number, NaoIdentificado]> = result
+    ? result.nao_identificados.map((n, i): [number, NaoIdentificado] => [i, n]).filter(([i]) => pendingIndexes.has(i))
+    : [];
 
   return (
     <div className="space-y-6">
@@ -158,7 +153,7 @@ export default function PhotoAnalysisPage() {
           <Badge variant="warning">PRO</Badge>
         </h1>
         <p className="text-sm text-ink-muted">
-          Estime calorias por foto ou informando os alimentos e gramas manualmente.
+          Identifique os alimentos por foto ou por texto — os valores nutricionais vêm da Tabela TACO/Unicamp.
         </p>
       </div>
 
@@ -173,12 +168,12 @@ export default function PhotoAnalysisPage() {
           <Camera className="h-4 w-4" /> Por foto
         </button>
         <button
-          onClick={() => setMode('manual')}
+          onClick={() => setMode('text')}
           className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-            mode === 'manual' ? 'bg-white shadow-sm text-ink' : 'text-ink-muted hover:text-ink-secondary'
+            mode === 'text' ? 'bg-white shadow-sm text-ink' : 'text-ink-muted hover:text-ink-secondary'
           }`}
         >
-          <Sparkles className="h-4 w-4" /> Por gramas
+          <Sparkles className="h-4 w-4" /> Por texto
         </button>
       </div>
 
@@ -202,8 +197,8 @@ export default function PhotoAnalysisPage() {
               )}
             </div>
             <input ref={fileRef} type="file" accept="image/jpeg,image/png,image/webp" onChange={handleFile} className="hidden" />
-            {file && (
-              <Button className="w-full" loading={isPending} onClick={() => analyzePhoto.mutate(file)}>
+            {preview && (
+              <Button className="w-full" loading={analyze.isPending} onClick={() => analyze.mutate({ mode: 'photo', image: preview })}>
                 <Sparkles className="h-4 w-4" /> Analisar refeição
               </Button>
             )}
@@ -211,60 +206,30 @@ export default function PhotoAnalysisPage() {
         </Card>
       )}
 
-      {/* Modo manual */}
-      {mode === 'manual' && (
+      {/* Modo texto */}
+      {mode === 'text' && (
         <Card>
           <div className="space-y-4">
-            <p className="text-sm text-ink-secondary">
-              Informe cada alimento e a quantidade em gramas para obter uma estimativa calórica.
-            </p>
-
-            <div className="space-y-3">
-              {manualFoods.map((food, i) => (
-                <div key={i} className="flex gap-2 items-end">
-                  <div className="flex-1">
-                    {i === 0 && <label className="text-xs text-ink-muted mb-1 block">Alimento</label>}
-                    <Input
-                      placeholder="ex: arroz branco, frango grelhado..."
-                      value={food.name}
-                      onChange={(e) => updateFood(i, 'name', e.target.value)}
-                    />
-                  </div>
-                  <div className="w-28">
-                    {i === 0 && <label className="text-xs text-ink-muted mb-1 block">Gramas</label>}
-                    <Input
-                      type="number"
-                      placeholder="150"
-                      min="1"
-                      value={food.grams}
-                      onChange={(e) => updateFood(i, 'grams', e.target.value)}
-                    />
-                  </div>
-                  {manualFoods.length > 1 && (
-                    <button
-                      onClick={() => removeFood(i)}
-                      className="mb-0 p-2 text-ink-muted hover:text-red-500 transition-colors"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </button>
-                  )}
-                </div>
-              ))}
+            <div>
+              <label className="text-sm text-ink-secondary block mb-2">
+                Descreva o que você comeu — pode informar a quantidade ou não
+              </label>
+              <textarea
+                value={textInput}
+                onChange={(e) => setTextInput(e.target.value)}
+                rows={3}
+                placeholder="ex: 150g de arroz, 100g de frango grelhado e um pouco de feijão"
+                className="w-full px-3 py-2 rounded-sm border border-border text-sm focus:ring-2 focus:ring-primary-500 focus:outline-none"
+              />
             </div>
-
-            <div className="flex gap-2">
-              <Button variant="outline" onClick={addFood} className="flex-1">
-                <Plus className="h-4 w-4" /> Adicionar alimento
-              </Button>
-              <Button
-                className="flex-1"
-                loading={isPending}
-                onClick={() => analyzeManual.mutate(manualFoods)}
-                disabled={!manualFoods.some((f) => f.name.trim() && f.grams)}
-              >
-                <Sparkles className="h-4 w-4" /> Calcular
-              </Button>
-            </div>
+            <Button
+              className="w-full"
+              loading={analyze.isPending}
+              disabled={!textInput.trim()}
+              onClick={() => analyze.mutate({ mode: 'text', input: textInput.trim() })}
+            >
+              <Sparkles className="h-4 w-4" /> Calcular
+            </Button>
           </div>
         </Card>
       )}
@@ -278,44 +243,82 @@ export default function PhotoAnalysisPage() {
           </h2>
           <div className="space-y-3">
             <div className="rounded-sm bg-surface-secondary p-4">
-              <p className="text-xs text-ink-muted uppercase tracking-wide mb-1">Estimativa total</p>
-              <p className="text-2xl font-semibold text-ink">{result.total_calories_estimate} kcal</p>
+              <p className="text-xs text-ink-muted uppercase tracking-wide mb-1">Total calculado</p>
+              <p className="text-2xl font-semibold text-ink">{totalKcal} kcal</p>
             </div>
 
-            <ul className="space-y-2">
-              {(result.foods as Array<{
-                name: string;
-                estimated_calories: number;
-                grams?: number;
-                macros?: { protein_g: number; carbs_g: number; fat_g: number };
-              }>).map((f, i) => (
-                <li key={i} className="text-sm border-b border-divider pb-2">
-                  <div className="flex justify-between">
-                    <span className="text-ink-secondary font-medium">{f.name}</span>
-                    <span className="text-ink-muted">~{f.estimated_calories} kcal</span>
-                  </div>
-                  {f.grams !== undefined && (
-                    <div className="flex gap-3 mt-0.5 text-xs text-ink-muted">
-                      <span>{f.grams}g</span>
-                      {f.macros && (
-                        <>
-                          <span>P: {f.macros.protein_g}g</span>
-                          <span>C: {f.macros.carbs_g}g</span>
-                          <span>G: {f.macros.fat_g}g</span>
-                        </>
-                      )}
+            {allDisplayItems.length > 0 && (
+              <ul className="space-y-2">
+                {allDisplayItems.map((f, i) => (
+                  <li key={i} className="text-sm border-b border-divider pb-2">
+                    <div className="flex justify-between">
+                      <span className="text-ink-secondary font-medium">
+                        {f.nome}
+                        {f.estimado && <span className="text-ink-muted font-normal"> (estimado)</span>}
+                      </span>
+                      <span className="text-ink-muted">{f.kcal} kcal</span>
                     </div>
-                  )}
-                </li>
-              ))}
-            </ul>
+                    <div className="flex gap-3 mt-0.5 text-xs text-ink-muted">
+                      <span>{f.gramas}g</span>
+                      <span>P: {f.proteina_g}g</span>
+                      <span>C: {f.carbo_g}g</span>
+                      <span>G: {f.gordura_g}g</span>
+                      <span>Fibra: {f.fibra_g}g</span>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
 
-            {result.notes && <p className="text-sm text-ink-secondary">{result.notes}</p>}
-            <Disclaimer variant="warning">{result.disclaimer}</Disclaimer>
+            {/* Alimentos não identificados — nunca um valor inventado, sempre desambiguação */}
+            {pendingNaoIdentificados.length > 0 && (
+              <div className="rounded-sm border border-warning/30 bg-warning/5 p-3 space-y-3">
+                <p className="text-sm font-medium text-ink">
+                  {pendingNaoIdentificados.length} alimento(s) não identificado(s) com segurança
+                </p>
+                {pendingNaoIdentificados.map(([index, item]) => (
+                  <div key={index} className="text-sm">
+                    <p className="text-ink-secondary">
+                      &quot;{item.alimento}&quot; ({item.gramas}g) — qual desses é o alimento certo?
+                    </p>
+                    {item.candidatos.length > 0 ? (
+                      <div className="flex flex-wrap gap-2 mt-1.5">
+                        {item.candidatos.map((c) => (
+                          <button
+                            key={c.id}
+                            onClick={() => handleResolve(index, c.id, item.gramas)}
+                            disabled={resolve.isPending}
+                            className="text-xs px-2.5 py-1 rounded-full border border-border bg-surface hover:border-primary-300 hover:bg-primary-50 transition-colors disabled:opacity-50"
+                          >
+                            {c.nome}
+                          </button>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-xs text-ink-muted mt-1">
+                        Não encontramos nada parecido na tabela — não incluído no total.
+                      </p>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {result.comentario && <p className="text-sm text-ink-secondary">{result.comentario}</p>}
+
+            {hasEstimated && (
+              <p className="text-xs text-ink-muted">
+                Porções estimadas por IA · Valores nutricionais: Tabela TACO/Unicamp
+              </p>
+            )}
+            <Disclaimer variant="warning">
+              Estimativa de porção gerada por IA; valores nutricionais vêm da Tabela TACO/Unicamp e não
+              substituem avaliação de um(a) nutricionista.
+            </Disclaimer>
 
             <button
               onClick={() => addCalorieMutation.mutate()}
-              disabled={addedToCalories || addCalorieMutation.isPending}
+              disabled={addedToCalories || addCalorieMutation.isPending || allDisplayItems.length === 0}
               className={`w-full flex items-center justify-center gap-2 rounded-md py-3 px-4 text-sm font-semibold transition-all duration-200 ${
                 addedToCalories
                   ? 'bg-red-50 text-red-400 cursor-default border border-red-100'
@@ -342,16 +345,16 @@ export default function PhotoAnalysisPage() {
               <Card key={h.id} className="flex items-center justify-between">
                 <div>
                   <p className="font-medium text-sm text-ink">
-                    {(h.result as PhotoAnalysisResult).total_calories_estimate} kcal estimadas
+                    {h.result.totais.kcal} kcal
                   </p>
                   <p className="text-xs text-ink-muted">{formatDate(h.created_at)}</p>
                 </div>
                 <div className="text-right">
                   <p className="text-xs text-ink-muted">
-                    {(h.result as PhotoAnalysisResult).foods.length} alimentos
+                    {h.result.itens.length} alimento(s)
                   </p>
-                  {h.image_url === 'manual' && (
-                    <Badge variant="neutral" className="mt-1">manual</Badge>
+                  {(h.image_url === 'manual' || h.image_url === 'text') && (
+                    <Badge variant="neutral" className="mt-1">texto</Badge>
                   )}
                 </div>
               </Card>

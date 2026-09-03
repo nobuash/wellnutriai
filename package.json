@@ -10,7 +10,8 @@
     "type-check": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
-    "ingest": "tsx scripts/ingest-knowledge.ts"
+    "ingest": "tsx scripts/ingest-knowledge.ts",
+    "taco:import": "tsx scripts/import-taco-csv.ts"
   },
   "dependencies": {
     "@ducanh2912/next-pwa": "^10.2.9",
@@ -24,6 +25,7 @@
     "@tanstack/react-query": "^5.56.2",
     "@types/nodemailer": "^8.0.0",
     "clsx": "^2.1.1",
+    "fuse.js": "^7.5.0",
     "lucide-react": "^0.446.0",
     "mercadopago": "^2.12.0",
     "next": "14.2.35",
