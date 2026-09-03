@@ -28,9 +28,9 @@ export const viewport: Viewport = {
   userScalable: false,
 };
 
-const TITLE = 'WellNutriAI — Planos alimentares sugeridos por IA';
+const TITLE = 'WellNutriAI — IA especializada em nutrição';
 const DESCRIPTION =
-  'Receba planos alimentares personalizados, sugeridos por inteligência artificial, com base no seu objetivo e rotina.';
+  'WellNutriAI: IA especializada em alimentação, com plano alimentar sugerido, análise de refeições por foto e assistente personalizado para o seu objetivo e rotina.';
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),

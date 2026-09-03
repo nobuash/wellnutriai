@@ -104,7 +104,7 @@ export default function MealPlanPage() {
       {medicalBlockCard}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="font-display text-2xl text-ink">Plano alimentar sugerido</h1>
+          <h1 className="font-display text-2xl text-ink">Plano alimentar sugerido e personalizado</h1>
           <p className="text-sm text-ink-muted">
             Gerado em {formatDate(mealPlan.created_at)} · Sugestão de IA
           </p>

@@ -183,7 +183,7 @@ export default function PricingPage() {
           <h3 className="font-display text-lg text-ink mb-1">Free</h3>
           <p className="text-3xl font-semibold text-ink mb-6">R$ 0</p>
           <ul className="space-y-2 mb-6">
-            {['1 plano alimentar por mês', 'Sem chat com IA', 'Sem análise de refeição'].map((f) => (
+            {['1 plano alimentar por mês', 'Sem assistente especializado', 'Sem análise de refeição'].map((f) => (
               <li key={f} className="flex items-center gap-2 text-sm text-ink-secondary">
                 <Check className="h-4 w-4 text-primary-600 shrink-0" />{f}
               </li>
@@ -252,7 +252,7 @@ export default function PricingPage() {
           )}
 
           <ul className="space-y-2 mb-6 mt-4">
-            {['Até 6 planos alimentares por mês, editáveis pelo chat', 'Chat com IA — uso amplo, sujeito à política de uso justo', 'Até 30 análises de refeição por mês (foto ou manual)', 'Suporte prioritário'].map((f) => (
+            {['Até 6 planos alimentares por mês, editáveis pelo assistente', 'Assistente especializado em alimentação — uso amplo, sujeito à política de uso justo', 'Até 30 análises de refeição por mês (foto ou manual)', 'Suporte prioritário'].map((f) => (
               <li key={f} className="flex items-center gap-2 text-sm text-ink-secondary">
                 <Check className="h-4 w-4 text-primary-600 shrink-0" />{f}
               </li>

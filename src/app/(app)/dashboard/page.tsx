@@ -93,7 +93,9 @@ export default async function DashboardPage() {
       <div className="flex items-start justify-between gap-4">
         <div>
           <h1 className="font-display text-3xl text-ink">Olá, {profile?.name?.split(' ')[0] || 'bem-vindo'}!</h1>
-          <p className="text-ink-muted mt-1">Aqui está um resumo da sua jornada nutricional.</p>
+          <p className="text-ink-muted mt-1">
+            Seu acompanhamento alimentar com IA especializada, baseado no seu perfil e objetivos.
+          </p>
         </div>
         <StreakBadge days={streak.days} loggedToday={streak.loggedToday} />
       </div>
@@ -188,7 +190,7 @@ export default async function DashboardPage() {
         <Shortcut
           href={isPro ? '/chat' : '/pricing'}
           icon={MessageCircle}
-          label="Chat IA"
+          label="Assistente"
           locked={!isPro}
         />
         <Shortcut

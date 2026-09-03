@@ -3,7 +3,7 @@ import Image from 'next/image';
 import { Button } from '@/components/ui/Button';
 import { SocialLinks } from '@/components/SocialLinks';
 import { HomeJsonLd } from '@/components/seo/HomeJsonLd';
-import { Brain, Camera, Check, MessageCircle, Sparkles } from 'lucide-react';
+import { Brain, Camera, Check, Layers, MessageCircle, Sparkles, UserCheck, Utensils } from 'lucide-react';
 
 export default function LandingPage() {
   return (
@@ -32,15 +32,16 @@ export default function LandingPage() {
         <div>
           <div className="inline-flex items-center gap-2 rounded-full border border-primary-200 bg-primary-50 px-4 py-1.5 text-sm text-primary-700 mb-7">
             <Sparkles className="h-4 w-4" />
-            Planos alimentares sugeridos por IA
+            IA especializada em nutrição
           </div>
           <h1 className="font-display text-4xl md:text-5xl leading-[1.1] text-ink mb-6">
             Nutrição inteligente,<br />
             <em className="italic font-medium text-primary-600">feita para você</em>
           </h1>
           <p className="text-lg text-ink-secondary max-w-xl mb-9 leading-relaxed">
-            Receba sugestões alimentares personalizadas com base no seu perfil, objetivo e rotina —
-            geradas por inteligência artificial em segundos.
+            O WellNutriAI é uma IA especializada em alimentação: considera seu objetivo,
+            características, preferências e restrições para sugerir um plano alimentar mais
+            relevante para a sua rotina.
           </p>
           <div className="flex items-center gap-4">
             <Link href="/signup">
@@ -87,6 +88,50 @@ export default function LandingPage() {
         </div>
       </section>
 
+      {/* DIFERENCIAIS — por que não é só mais um chatbot */}
+      <section className="bg-surface-secondary py-16 border-t border-divider">
+        <div className="mx-auto max-w-6xl px-6">
+          <div className="max-w-2xl mx-auto text-center mb-12">
+            <h2 className="font-display text-3xl text-ink mb-4">
+              Por que o WellNutriAI não é apenas mais um chatbot?
+            </h2>
+            <p className="text-ink-secondary leading-relaxed">
+              Diferentemente de uma inteligência artificial generalista, o WellNutriAI foi
+              desenvolvido especificamente para o acompanhamento alimentar — reunindo perfil,
+              objetivos, preferências, plano alimentar sugerido, análise de refeições e um
+              assistente especializado em alimentação em um só lugar.
+            </p>
+          </div>
+          <div className="grid sm:grid-cols-3 gap-10">
+            {[
+              {
+                icon: Utensils,
+                title: 'Especialização em alimentação',
+                desc: 'Uma experiência desenvolvida especificamente para dúvidas, organização e acompanhamento alimentar.',
+              },
+              {
+                icon: UserCheck,
+                title: 'Personalização baseada no seu perfil',
+                desc: 'As sugestões consideram seus objetivos, características, preferências e restrições informadas.',
+              },
+              {
+                icon: Layers,
+                title: 'Acompanhamento integrado',
+                desc: 'Plano alimentar sugerido, análise de refeições por foto, histórico e assistente reunidos em um único lugar.',
+              },
+            ].map(({ icon: Icon, title, desc }) => (
+              <div key={title} className="text-center">
+                <div className="h-11 w-11 mx-auto rounded-full bg-primary-50 text-primary-600 flex items-center justify-center mb-4">
+                  <Icon className="h-5 w-5" strokeWidth={1.75} />
+                </div>
+                <h3 className="font-semibold text-ink text-base mb-2">{title}</h3>
+                <p className="text-ink-secondary text-sm leading-relaxed">{desc}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
       {/* BENEFÍCIOS — lista dividida, não 3 cards iguais */}
       <section className="mx-auto max-w-6xl px-6 py-20 border-t border-divider">
         <div className="grid md:grid-cols-[0.9fr_2fr] gap-8 md:gap-16">
@@ -95,17 +140,17 @@ export default function LandingPage() {
             {[
               {
                 icon: Brain,
-                title: 'Plano sugerido por IA',
+                title: 'Plano alimentar sugerido e personalizado',
                 desc: 'Sugestões alimentares personalizadas com base no seu questionário nutricional.',
               },
               {
                 icon: MessageCircle,
-                title: 'Chat inteligente',
+                title: 'Assistente especializado em alimentação',
                 desc: 'Tire dúvidas, peça substituições e ajustes no seu plano com nosso assistente.',
               },
               {
                 icon: Camera,
-                title: 'Análise por foto',
+                title: 'Análise inteligente de refeições',
                 desc: 'Tire uma foto da refeição e receba uma estimativa dos alimentos e calorias.',
               },
             ].map(({ icon: Icon, title, desc }) => (

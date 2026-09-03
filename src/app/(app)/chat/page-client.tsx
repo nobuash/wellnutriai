@@ -87,8 +87,11 @@ export default function ChatPage() {
     return (
       <div className="space-y-4">
         <div>
-          <h1 className="font-display text-2xl text-ink">Chat com IA</h1>
-          <p className="text-sm text-ink-muted">Tire dúvidas, peça substituições ou ajustes no seu plano.</p>
+          <h1 className="font-display text-2xl text-ink">Assistente especializado em alimentação</h1>
+          <p className="text-sm text-ink-muted">
+            Converse sobre sua alimentação, tire dúvidas e receba sugestões considerando as
+            informações do seu perfil.
+          </p>
         </div>
         <Card className="text-center py-12 space-y-4">
           <div className="flex justify-center">
@@ -99,8 +102,9 @@ export default function ChatPage() {
           <div>
             <h2 className="font-display text-xl text-ink">Recurso exclusivo PRO</h2>
             <p className="text-ink-muted mt-1 max-w-sm mx-auto">
-              O chat com IA está disponível apenas no plano PRO. Faça upgrade para conversar
-              com a IA sobre seu plano alimentar.
+              O assistente especializado em alimentação está disponível apenas no plano PRO.
+              Faça upgrade para conversar sobre sua alimentação e receber sugestões
+              personalizadas.
             </p>
           </div>
           <Link href="/pricing">
@@ -117,9 +121,10 @@ export default function ChatPage() {
   return (
     <div className="space-y-4">
       <div>
-        <h1 className="text-2xl font-bold">Chat com IA</h1>
+        <h1 className="text-2xl font-bold">Assistente especializado em alimentação</h1>
         <p className="text-sm text-ink-muted">
-          Tire dúvidas, peça substituições ou ajustes no seu plano sugerido.
+          Converse sobre sua alimentação, tire dúvidas e receba sugestões considerando as
+          informações do seu perfil.
         </p>
       </div>
 
@@ -162,7 +167,7 @@ export default function ChatPage() {
           <input
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            placeholder="Pergunte algo sobre seu plano..."
+            placeholder="Pergunte algo sobre sua alimentação…"
             className="flex-1 h-10 px-3 rounded-sm border border-border text-sm focus:ring-2 focus:ring-primary-500 focus:outline-none"
             disabled={send.isPending}
           />

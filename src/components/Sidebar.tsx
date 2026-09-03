@@ -16,7 +16,7 @@ const nav = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/questionnaire', label: 'Questionário', icon: ClipboardList },
   { href: '/meal-plan', label: 'Plano Alimentar', icon: Utensils },
-  { href: '/chat', label: 'Chat IA', icon: MessageCircle, pro: true },
+  { href: '/chat', label: 'Assistente', icon: MessageCircle, pro: true },
   { href: '/photo-analysis', label: 'Análise por Foto', icon: Camera, pro: true },
   { href: '/install-app', label: 'Instalar no celular', icon: Smartphone },
   { href: '/support', label: 'Suporte', icon: HeadphonesIcon },
@@ -99,7 +99,7 @@ export function Sidebar({ plan, name, isOpen, onClose }: SidebarProps) {
               <Sparkles className="h-4 w-4" strokeWidth={1.75} />
               <span className="font-semibold text-sm">Upgrade para PRO</span>
             </div>
-            <p className="text-xs text-primary-50/90 mb-3 leading-relaxed">Mais planos por mês, chat com IA e análise de refeição.</p>
+            <p className="text-xs text-primary-50/90 mb-3 leading-relaxed">Mais planos por mês, assistente especializado e análise de refeição.</p>
             <Link
               href="/pricing"
               onClick={onClose}

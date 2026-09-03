@@ -1,7 +1,7 @@
 {
   "name": "WellNutriAI",
   "short_name": "WellNutriAI",
-  "description": "Planos alimentares personalizados sugeridos por inteligência artificial.",
+  "description": "Acompanhamento alimentar com IA especializada em nutrição.",
   "start_url": "/dashboard",
   "display": "standalone",
   "background_color": "#FAF8F3",
