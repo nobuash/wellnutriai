@@ -1,8 +1,13 @@
 // CommonJS de propósito (não .ts): next.config.js roda puro Node, sem
 // o pipeline de TS do Next, e precisa dar `require()` neste arquivo
-// diretamente — ver o bloco "Bloqueador de lançamento" em
+// diretamente — ver o aviso de "Documentos legais incompletos" em
 // next.config.js. Mesma lógica também coberta por
 // src/lib/__tests__/legalDocsGate.test.ts.
+//
+// Isto só identifica o que está faltando (usado para o aviso de build
+// e para src/config/legal.ts calcular PRIVACY_PAGE_COMPLETE e
+// equivalentes) — nunca bloqueia build/deploy. Ver o histórico deste
+// arquivo se precisar da versão anterior que bloqueava.
 
 const REQUIRED_LEGAL_ENV_VARS = [
   'LEGAL_ENTITY_NAME',
@@ -20,11 +25,4 @@ function getMissingLegalEnvVars(env) {
   return REQUIRED_LEGAL_ENV_VARS.filter((key) => !env[key]);
 }
 
-// Só bloqueia de verdade o deploy de produção real da Vercel — dev,
-// CI e previews de PR nunca são bloqueados por documento jurídico
-// incompleto (ver next.config.js para o motivo).
-function shouldBlockProductionDeploy(env) {
-  return getMissingLegalEnvVars(env).length > 0 && env.VERCEL_ENV === 'production';
-}
-
-module.exports = { REQUIRED_LEGAL_ENV_VARS, getMissingLegalEnvVars, shouldBlockProductionDeploy };
+module.exports = { REQUIRED_LEGAL_ENV_VARS, getMissingLegalEnvVars };

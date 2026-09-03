@@ -1,13 +1,14 @@
 import type { Metadata } from 'next';
 import { LegalPageLayout } from '@/components/LegalPageLayout';
 import { PLAN_LIMITS } from '@/lib/plans';
-import { LEGAL_DOCS_UPDATED_AT } from '@/config/legal';
+import { FAIR_USE_PAGE_COMPLETE, LEGAL_DOCS_UPDATED_AT } from '@/config/legal';
 
 export const metadata: Metadata = {
   title: 'Política de Uso Justo — WellNutriAI',
   description:
     'Limites de uso das funcionalidades de inteligência artificial do WellNutriAI por plano.',
   alternates: { canonical: '/fair-use' },
+  robots: FAIR_USE_PAGE_COMPLETE ? { index: true, follow: true } : { index: false, follow: false },
 };
 
 export default function FairUsePage() {

@@ -1,12 +1,18 @@
 import type { Metadata } from 'next';
 import { LegalPageLayout } from '@/components/LegalPageLayout';
-import { BACKUP_RETENTION_POLICY_TEXT, LEGAL_DOCS_UPDATED_AT, LEGAL_MINIMUM_RETENTION_TEXT } from '@/config/legal';
+import {
+  BACKUP_RETENTION_POLICY_TEXT,
+  DATA_RETENTION_PAGE_COMPLETE,
+  LEGAL_DOCS_UPDATED_AT,
+  LEGAL_MINIMUM_RETENTION_TEXT,
+} from '@/config/legal';
 
 export const metadata: Metadata = {
   title: 'Política de Retenção de Dados — WellNutriAI',
   description:
     'Por quanto tempo o WellNutriAI mantém os dados da sua conta e o que acontece quando você a exclui.',
   alternates: { canonical: '/data-retention' },
+  robots: DATA_RETENTION_PAGE_COMPLETE ? { index: true, follow: true } : { index: false, follow: false },
 };
 
 // Reflete o comportamento real implementado no código (ver

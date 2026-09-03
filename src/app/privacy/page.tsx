@@ -6,6 +6,7 @@ import {
   LEGAL_ENTITY_ADDRESS,
   LEGAL_ENTITY_CNPJ,
   LEGAL_ENTITY_NAME,
+  PRIVACY_PAGE_COMPLETE,
 } from '@/config/legal';
 import { DATA_PROCESSORS } from '@/config/dataProcessors';
 
@@ -14,6 +15,11 @@ export const metadata: Metadata = {
   description:
     'Como o WellNutriAI coleta, usa e protege os dados pessoais dos usuários da plataforma, em conformidade com a LGPD.',
   alternates: { canonical: '/privacy' },
+  // Enquanto os dados institucionais não estiverem preenchidos (ver
+  // src/config/legal.ts), a página continua acessível mas não é
+  // indexada — nunca aparece em busca com "[PLACEHOLDER: ...]" ainda
+  // no texto.
+  robots: PRIVACY_PAGE_COMPLETE ? { index: true, follow: true } : { index: false, follow: false },
 };
 
 // [PLACEHOLDER PARA O MANTENEDOR]: rascunho estrutural com base no que

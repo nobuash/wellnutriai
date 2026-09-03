@@ -6,12 +6,14 @@ import {
   LEGAL_ENTITY_CNPJ,
   LEGAL_ENTITY_NAME,
   SUPPORT_CONTACT_EMAIL,
+  TERMS_PAGE_COMPLETE,
 } from '@/config/legal';
 
 export const metadata: Metadata = {
   title: 'Termos de Uso — WellNutriAI',
   description: 'Termos que regulam o acesso e uso da plataforma WellNutriAI.',
   alternates: { canonical: '/terms' },
+  robots: TERMS_PAGE_COMPLETE ? { index: true, follow: true } : { index: false, follow: false },
 };
 
 // [PLACEHOLDER PARA O MANTENEDOR]: este texto é um rascunho estrutural,
