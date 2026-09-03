@@ -48,7 +48,7 @@
     "@types/react-dom": "^18.3.0",
     "@vitest/ui": "^4.1.10",
     "autoprefixer": "^10.4.20",
-    "eslint": "^8.57.1",
+    "eslint": "^10.8.0",
     "eslint-config-next": "14.2.35",
     "pdf-parse": "^2.4.5",
     "postcss": "^8.4.47",
