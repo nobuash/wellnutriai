@@ -74,18 +74,51 @@ export interface ChatMessage {
   created_at: string;
 }
 
-export interface PhotoAnalysisResult {
-  foods: Array<{ name: string; estimated_calories: number }>;
-  total_calories_estimate: number;
-  notes: string;
-  disclaimer: string;
+// Item já calculado a partir da TACO (ver src/lib/nutrition/calculate.ts)
+// — nome oficial, porção e valores nutricionais determinísticos, nunca
+// estimados pelo LLM.
+export interface NutritionAnalysisItem {
+  nome: string;
+  gramas: number;
+  estimado: boolean;
+  kcal: number;
+  proteina_g: number;
+  carbo_g: number;
+  gordura_g: number;
+  fibra_g: number;
+}
+
+export interface NutritionAnalysisTotals {
+  kcal: number;
+  proteina_g: number;
+  carbo_g: number;
+  gordura_g: number;
+  fibra_g: number;
+}
+
+// Alimento que o LLM identificou mas não teve match confiável na TACO
+// — nunca tem valor nutricional inventado, só candidatos pra
+// desambiguação (ou nenhum, se não achou nada parecido).
+export interface NaoIdentificado {
+  alimento: string;
+  gramas: number;
+  estimado: boolean;
+  candidatos: Array<{ id: string; nome: string }>;
+}
+
+export interface NutritionAnalysisResult {
+  itens: NutritionAnalysisItem[];
+  totais: NutritionAnalysisTotals;
+  fonte: string;
+  nao_identificados: NaoIdentificado[];
+  comentario?: string;
 }
 
 export interface MealPhotoAnalysis {
   id: string;
   user_id: string;
   image_url: string;
-  result: PhotoAnalysisResult;
+  result: NutritionAnalysisResult;
   created_at: string;
 }
 

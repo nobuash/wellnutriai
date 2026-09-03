@@ -154,41 +154,64 @@ FORMATO DE RESPOSTA OBRIGATÓRIO — retorne APENAS este JSON, sem markdown ao r
 }`;
 }
 
-export const MANUAL_ANALYSIS_PROMPT = `Você é um assistente de nutrição educacional. O usuário informou alimentos e suas quantidades em gramas.
-Estime as calorias e macronutrientes de cada item com base em tabelas nutricionais padrão (TACO, USDA).
+/**
+ * REGRA CRÍTICA (ver src/lib/nutrition/): a partir da migração para a
+ * base TACO, nenhum prompt de análise de refeição pede pra IA
+ * calcular ou estimar caloria/macro — só identificar alimento +
+ * porção em gramas. O valor nutricional vem sempre de
+ * src/lib/nutrition/calculate.ts, determinístico, a partir da TACO.
+ * Nunca reintroduza "estimated_calories" ou similar num prompt de
+ * extração.
+ */
+export function buildFoodExtractionFromTextPrompt(input: string): string {
+  return `Você EXTRAI alimentos e porções de uma descrição em texto livre. Você NUNCA estima calorias, macronutrientes ou qualquer valor nutricional — isso é calculado por outro sistema, a partir de uma tabela de composição de alimentos, depois da sua resposta.
 
-REGRAS:
-- Estimativas são APROXIMADAS, nunca exatas.
-- Nunca afirme valores como precisos.
-- Os usuários têm níveis de escolaridade variados: o nome do alimento pode vir sem acento, abreviado, com erro de digitação ou em nome regional (ex: "mandioca"/"macaxeira"/"aipim", "pao"=pão, "arr"=arroz, "fgo"=frango). Reconheça a intenção pelo contexto em vez de tratar como alimento desconhecido.
-- Se mesmo assim um alimento for realmente desconhecido, faça sua melhor estimativa com base no nome mais próximo que fizer sentido, sem travar ou pular o item.
+TAREFA: identifique cada alimento mencionado e sua quantidade em gramas.
+- Se a pessoa informar a quantidade (ex: "150g de arroz"), use exatamente esse valor e marque "estimado": false.
+- Se a pessoa NÃO informar quantidade para um item (ex: "arroz e feijão", sem gramas), estime uma porção típica brasileira para esse alimento e marque "estimado": true.
+- Interprete abreviações, erros de digitação e nomes regionais/populares (ex: "miojo", "aipim"/"macaxeira", "arr"=arroz, "fgo"=frango) — mantenha o nome do jeito que a pessoa escreveu ou o mais próximo possível; a identificação exata do alimento na base de dados é feita depois, por outro sistema.
+- Não invente alimentos que a pessoa não mencionou.
+- NÃO inclua "calorias", "kcal" ou qualquer valor nutricional na resposta — não é sua função aqui.
 
-Retorne APENAS JSON válido no formato:
+Texto do usuário: "${input}"
+
+Retorne APENAS JSON válido, sem markdown, no formato:
 {
-  "foods": [
-    {
-      "name": "nome do alimento (normalizado, com grafia correta)",
-      "grams": 150,
-      "estimated_calories": 210,
-      "macros": { "protein_g": 5, "carbs_g": 40, "fat_g": 2 }
-    }
-  ],
-  "total_calories_estimate": 650,
-  "notes": "observações breves",
-  "disclaimer": "Esta é uma estimativa gerada por IA, não um cálculo nutricional preciso. Procure um profissional para análises exatas."
+  "items": [
+    { "alimento": "arroz branco cozido", "gramas": 150, "estimado": false },
+    { "alimento": "feijão", "gramas": 80, "estimado": true }
+  ]
+}`;
+}
+
+export const FOOD_EXTRACTION_FROM_PHOTO_PROMPT = `Você IDENTIFICA alimentos visíveis numa foto de refeição e ESTIMA a porção de cada um em gramas. Você NUNCA estima calorias, macronutrientes ou qualquer valor nutricional — isso é calculado por outro sistema, a partir de uma tabela de composição de alimentos, depois da sua resposta.
+
+TAREFA: para cada alimento visível na imagem, identifique o que é e estime a quantidade em gramas com base no tamanho aparente da porção (referências úteis: um punho fechado ≈ 150g de arroz/massa cozidos, a palma da mão ≈ 100-120g de carne/frango, uma concha média ≈ 80g de feijão).
+- Todo item de uma foto é necessariamente uma estimativa: sempre marque "estimado": true.
+- Se a imagem não tiver nenhum alimento reconhecível, retorne "items": [].
+- NÃO inclua "calorias", "kcal" ou qualquer valor nutricional na resposta — não é sua função aqui.
+
+Retorne APENAS JSON válido, sem markdown, no formato:
+{
+  "items": [
+    { "alimento": "arroz branco", "gramas": 150, "estimado": true },
+    { "alimento": "frango grelhado", "gramas": 120, "estimado": true }
+  ]
 }`;
 
-export const PHOTO_ANALYSIS_PROMPT = `Você é um assistente de análise visual de refeições. Identifique os alimentos na imagem e ESTIME (de forma aproximada) as calorias.
+/**
+ * Único uso de LLM depois do cálculo — só comenta números que JÁ
+ * existem, nunca recalcula. O prompt é deliberadamente explícito sobre
+ * isso porque é fácil um modelo "corrigir" um total que ele acha
+ * estranho; aqui isso seria pior que não ter comentário nenhum.
+ */
+export function buildMealCommentPrompt(itemsSummary: string, totals: {
+  kcal: number; proteina_g: number; carbo_g: number; gordura_g: number; fibra_g: number;
+}): string {
+  return `Você é um assistente de nutrição simpático. Os números abaixo JÁ FORAM CALCULADOS por outro sistema, a partir da Tabela TACO — não são um palpite seu. Não recalcule, não questione, não "corrija" estes valores, mesmo que pareçam altos ou baixos.
 
-REGRAS:
-- Estimativas são APROXIMADAS, nunca exatas.
-- Nunca afirme valores como precisos.
-- Se a imagem não contiver alimento, retorne foods vazio.
+Refeição: ${itemsSummary}
+Totais: ${totals.kcal} kcal, ${totals.proteina_g}g proteína, ${totals.carbo_g}g carboidrato, ${totals.gordura_g}g gordura, ${totals.fibra_g}g fibra.
 
-Retorne APENAS JSON válido no formato:
-{
-  "foods": [{"name": "arroz branco", "estimated_calories": 200}],
-  "total_calories_estimate": 650,
-  "notes": "observações breves",
-  "disclaimer": "Esta é uma estimativa gerada por IA, não um cálculo nutricional preciso. Procure um profissional para análises exatas."
-}`;
+Escreva um comentário curto (2-3 frases) sobre o equilíbrio dessa refeição e, se fizer sentido, uma sugestão gentil para as próximas. Use linguagem de SUGESTÃO, nunca prescrição. Responda só o texto do comentário — sem JSON, sem markdown, sem repetir os números.`;
+}
