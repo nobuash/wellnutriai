@@ -14,8 +14,8 @@ Convenção: `[ ]` pendente, `[x]` já resolvido (nesta rodada ou antes dela), `
 - [ ] Redigir (com advogado) e preencher `REFUND_POLICY_TEXT`, `BACKUP_RETENTION_POLICY_TEXT`, `LEGAL_MINIMUM_RETENTION_TEXT`.
 - [ ] Decidir a base legal (LGPD art. 7º/11) para o dado de saúde do questionário. Se for consentimento: `HEALTH_DATA_CONSENT_REQUIRED=true`.
 - [ ] Confirmar com OpenAI/Supabase/Stripe/Mercado Pago/Vercel: país de destino, mecanismo de transferência internacional, contato — preencher `src/config/dataProcessors.ts`.
-- [x] Trava de build que impede documento jurídico incompleto ir ao ar (`next.config.js` + `src/config/legal.ts`).
-- [x] Trava de runtime que impede geração de plano sem aprovação regulatória (`src/lib/regulatory.ts`).
+- [x] Cada página jurídica incompleta fica com `noindex` e fora do `sitemap.xml` automaticamente até os campos que ELA usa estarem preenchidos (`src/config/legal.ts` + cada `page.tsx` + `src/app/sitemap.ts`) — a página continua acessível (mostrando os `[PLACEHOLDER: ...]`), só não é promovida como definitiva. Isso NÃO bloqueia o build/deploy do resto do site (decisão tomada em 2026-09-03, a pedido do mantenedor, para não travar streak/TACO/P0 por dado institucional que só essas 5 páginas precisam — ver histórico do `next.config.js` para a versão anterior que bloqueava o build inteiro).
+- [x] Trava de runtime que impede geração de plano sem aprovação regulatória (`src/lib/regulatory.ts`) — essa continua bloqueando de verdade em produção, não foi afetada pela mudança acima.
 
 ## Privacidade/LGPD
 
@@ -99,9 +99,9 @@ Antes de considerar o sistema pronto para comercialização real:
 
 - [ ] Todos os itens de "Jurídico/regulatório" acima resolvidos.
 - [ ] `REGULATORY_REVIEW_APPROVED=true` e (se aplicável) `HEALTH_DATA_CONSENT_REQUIRED` decidido.
-- [ ] Migrations 026 e 027 aplicadas em produção.
+- [x] Migrations 026, 027 e 028 aplicadas em produção (confirmado em 2026-09-03).
 - [ ] Nutricionista revisou os fatores de `src/lib/nutrition/energy.ts`.
-- [ ] Build de produção real (`VERCEL_ENV=production`) passa sem erro (confirma que os docs legais estão completos).
+- [ ] `PRIVACY_PAGE_COMPLETE`, `TERMS_PAGE_COMPLETE`, `CANCELLATION_PAGE_COMPLETE`, `DATA_RETENTION_PAGE_COMPLETE` e `FAIR_USE_PAGE_COMPLETE` (`src/config/legal.ts`) todos `true` — confirma que nenhuma página jurídica pública ainda está com `noindex`/fora do sitemap por dado institucional faltando. **O build passar sozinho não confirma mais isso** (ver nota abaixo).
 - [ ] Itens 9–28 avaliados e sequenciados como próxima rodada (nenhum é bloqueador do tipo P0, mas vários são importantes antes de escalar tráfego real).
 
-**Não classifique como GO só porque o build passou.** Ver a seção "Definição de pronto para comercializar" do pedido original — por esse critério, hoje o sistema está **NO-GO**, com bloqueadores claros e documentados acima, a maioria deles dependendo de uma decisão ou dado que só o mantenedor tem.
+**Não classifique como GO só porque o build passou.** Desde 2026-09-03 o build de produção **não falha mais** por documento jurídico incompleto — só emite aviso no log e deixa a página específica com `noindex`/fora do sitemap (decisão do mantenedor, para não travar o resto do produto). Isso significa que "build verde" deixou de ser prova de documentação jurídica completa — confira o item acima em vez disso. Pelo critério da seção "Definição de pronto para comercializar" do pedido original, hoje o sistema está **NO-GO**, com bloqueadores claros e documentados acima, a maioria deles dependendo de uma decisão ou dado que só o mantenedor tem.

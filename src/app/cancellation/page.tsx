@@ -1,12 +1,13 @@
 import type { Metadata } from 'next';
 import { LegalPageLayout } from '@/components/LegalPageLayout';
-import { LEGAL_DOCS_UPDATED_AT, REFUND_POLICY_TEXT } from '@/config/legal';
+import { CANCELLATION_PAGE_COMPLETE, LEGAL_DOCS_UPDATED_AT, REFUND_POLICY_TEXT } from '@/config/legal';
 
 export const metadata: Metadata = {
   title: 'Política de Cancelamento — WellNutriAI',
   description:
     'Como cancelar sua assinatura do WellNutriAI e o que acontece com seu plano após o cancelamento.',
   alternates: { canonical: '/cancellation' },
+  robots: CANCELLATION_PAGE_COMPLETE ? { index: true, follow: true } : { index: false, follow: false },
 };
 
 export default function CancellationPage() {
