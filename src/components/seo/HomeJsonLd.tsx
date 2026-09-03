@@ -6,7 +6,7 @@ import { SITE_NAME, SITE_URL } from '@/lib/seo';
 export function HomeJsonLd() {
   const logo = `${SITE_URL}/icons/icon-512x512.png`;
   const description =
-    'Receba planos alimentares personalizados, sugeridos por inteligência artificial, com base no seu objetivo e rotina.';
+    'WellNutriAI: IA especializada em alimentação, com plano alimentar sugerido, análise de refeições por foto e assistente personalizado para o seu objetivo e rotina.';
 
   const graph = [
     {

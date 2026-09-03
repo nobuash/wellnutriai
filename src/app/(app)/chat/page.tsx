@@ -1,6 +1,6 @@
 import { privateMetadata } from '@/lib/seo';
 import ChatPage from './page-client';
 
-export const metadata = privateMetadata('Chat com IA — WellNutriAI');
+export const metadata = privateMetadata('Assistente especializado em alimentação — WellNutriAI');
 
 export default ChatPage;

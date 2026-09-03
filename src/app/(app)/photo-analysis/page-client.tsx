@@ -149,11 +149,12 @@ export default function PhotoAnalysisPage() {
     <div className="space-y-6">
       <div>
         <h1 className="font-display text-2xl text-ink flex items-center gap-2">
-          Análise de refeição
+          Análise inteligente da sua refeição
           <Badge variant="warning">PRO</Badge>
         </h1>
         <p className="text-sm text-ink-muted">
-          Identifique os alimentos por foto ou por texto — os valores nutricionais vêm da Tabela TACO/Unicamp.
+          Envie uma foto ou descreva o que comeu para receber uma estimativa nutricional, com
+          valores da Tabela TACO/Unicamp.
         </p>
       </div>
 
