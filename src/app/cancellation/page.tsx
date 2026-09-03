@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { LegalPageLayout } from '@/components/LegalPageLayout';
+import { LEGAL_DOCS_UPDATED_AT, REFUND_POLICY_TEXT } from '@/config/legal';
 
 export const metadata: Metadata = {
   title: 'Política de Cancelamento — WellNutriAI',
@@ -10,7 +11,7 @@ export const metadata: Metadata = {
 
 export default function CancellationPage() {
   return (
-    <LegalPageLayout title="Política de Cancelamento" updatedAt="[PLACEHOLDER: data de publicação]">
+    <LegalPageLayout title="Política de Cancelamento" updatedAt={LEGAL_DOCS_UPDATED_AT ?? '[PLACEHOLDER: data de publicação]'}>
       <h2>1. Como cancelar</h2>
       <p>
         Assinaturas recorrentes (cobrança automática via cartão) podem ser
@@ -38,12 +39,16 @@ export default function CancellationPage() {
 
       <h2>4. Reembolso</h2>
       <p>
-        <strong>[PLACEHOLDER: descrever a política de reembolso/direito de
-        arrependimento aplicável — no Brasil, consumidores têm direito de
-        arrependimento em até 7 dias para compras feitas fora de
-        estabelecimento comercial físico, conforme art. 49 do CDC; confirme
-        com um profissional de direito como isso se aplica ao seu caso e
-        preencha os prazos/processo reais aqui]</strong>.
+        <strong>
+          {REFUND_POLICY_TEXT ??
+            '[PLACEHOLDER: descrever a política de reembolso/direito de ' +
+              'arrependimento aplicável — no Brasil, consumidores têm direito de ' +
+              'arrependimento em até 7 dias para compras feitas fora de ' +
+              'estabelecimento comercial físico, conforme art. 49 do CDC; confirme ' +
+              'com um profissional de direito como isso se aplica ao seu caso e ' +
+              'preencha os prazos/processo reais aqui]'}
+        </strong>
+        .
       </p>
 
       <h2>5. Exclusão de conta</h2>

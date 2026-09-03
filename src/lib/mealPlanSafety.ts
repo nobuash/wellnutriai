@@ -44,6 +44,30 @@ export function isHighRiskCondition(q: Partial<MedicalScreeningFields>): boolean
   );
 }
 
+export type NutritionSafetyMode = 'standard' | 'restricted';
+
+/**
+ * Ponto único de decisão de risco nutricional — usado pela geração de
+ * plano, pelo chat (texto livre E edição estruturada) e pela venda do
+ * PRO (ver src/app/(app)/pricing/page-client.tsx). Sempre derivado do
+ * questionário salvo no servidor, nunca de algo que o usuário
+ * mencione na conversa — um usuário 'restricted' continua restricted
+ * mesmo que não repita a condição no chat.
+ *
+ * questionnaire === null (usuário ainda não respondeu) é tratado como
+ * 'standard' aqui de propósito: a ausência de questionário já é
+ * bloqueada separadamente onde isso importa (geração de plano exige
+ * questionário antes de chegar a este ponto); no chat, alguém sem
+ * questionário simplesmente não tem nenhuma condição conhecida para
+ * restringir.
+ */
+export function getNutritionSafetyMode(
+  questionnaire: Partial<MedicalScreeningFields> | null,
+): NutritionSafetyMode {
+  if (!questionnaire) return 'standard';
+  return isHighRiskCondition(questionnaire) ? 'restricted' : 'standard';
+}
+
 function normalize(text: string): string {
   return text
     .toLowerCase()

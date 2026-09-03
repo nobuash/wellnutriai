@@ -1,4 +1,5 @@
 import { requireCurrentConsent, consentReasonMessage } from '@/lib/consentCheck';
+import { healthDataConsentReasonMessage, requireHealthDataConsent } from '@/lib/healthDataConsent';
 import { createClient } from '@/lib/supabase/server';
 import { createServiceClient } from '@/lib/supabase/service';
 import { questionnaireSchema } from '@/lib/validation';
@@ -28,6 +29,16 @@ export async function POST(req: Request) {
   const consent = await requireCurrentConsent(supabase, user.id);
   if (!consent.ok) {
     return NextResponse.json({ error: consentReasonMessage(consent.reason!) }, { status: 403 });
+  }
+
+  // Não-op enquanto HEALTH_DATA_CONSENT_REQUIRED não estiver ligada —
+  // ver src/lib/healthDataConsent.ts.
+  const healthConsent = await requireHealthDataConsent(supabase, user.id);
+  if (!healthConsent.ok) {
+    return NextResponse.json(
+      { error: healthDataConsentReasonMessage(healthConsent.reason!), healthDataConsent: false },
+      { status: 403 },
+    );
   }
 
   const json = await req.json().catch(() => ({}));

@@ -5,9 +5,15 @@ import { Card } from '@/components/ui/Card';
 import { Input } from '@/components/ui/Input';
 import { questionnaireSchema, type QuestionnaireInput } from '@/lib/validation';
 import { zodResolver } from '@hookform/resolvers/zod';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Controller, useForm } from 'react-hook-form';
 import { toast } from 'sonner';
+
+const BIOLOGICAL_SEX_OPTIONS = [
+  { value: 'female', label: 'Feminino' },
+  { value: 'male', label: 'Masculino' },
+] as const;
 
 const GOALS = [
   { value: 'lose_fat', label: 'Perder gordura' },
@@ -112,7 +118,9 @@ export default function QuestionnairePage() {
     <Card className="max-w-3xl p-8">
       <h1 className="font-display text-2xl text-ink mb-1.5">Questionário nutricional</h1>
       <p className="text-sm text-ink-muted mb-6">
-        Seus dados ficam privados e são usados apenas para gerar seu plano sugerido por IA.
+        Usamos esses dados para gerar seu plano alimentar e as demais funcionalidades de IA da
+        plataforma (chat, análise de foto). Veja como tratamos seus dados na{' '}
+        <Link href="/privacy" className="text-primary-600 underline">Política de Privacidade</Link>.
       </p>
 
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
@@ -120,6 +128,26 @@ export default function QuestionnairePage() {
           <Input label="Idade" type="number" {...register('age')} error={errors.age?.message} />
           <Input label="Peso (kg)" type="number" step="0.1" {...register('weight')} error={errors.weight?.message} />
           <Input label="Altura (cm)" type="number" step="0.1" {...register('height')} error={errors.height?.message} />
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-ink-secondary mb-2">Sexo biológico</label>
+          <p className="text-xs text-ink-muted mb-2">
+            Usado exclusivamente para calcular sua taxa metabólica basal (fórmula de
+            Mifflin-St Jeor) — sem essa informação não conseguimos calcular uma meta de
+            calorias para o seu plano.
+          </p>
+          <div className="grid grid-cols-2 gap-2">
+            {BIOLOGICAL_SEX_OPTIONS.map((s) => (
+              <label key={s.value} className="cursor-pointer">
+                <input type="radio" value={s.value} {...register('biological_sex')} className="peer sr-only" />
+                <div className="rounded-sm border border-border p-3 text-center text-sm peer-checked:border-primary-600 peer-checked:bg-primary-50 peer-checked:text-primary-700 peer-checked:font-medium">
+                  {s.label}
+                </div>
+              </label>
+            ))}
+          </div>
+          {errors.biological_sex && <p className="text-xs text-error mt-1">Selecione uma opção</p>}
         </div>
 
         <div className="grid md:grid-cols-2 gap-4">

@@ -6,6 +6,7 @@ const BASE_INPUT = {
   weight: 70,
   height: 175,
   body_fat: null,
+  biological_sex: 'female' as const,
   goal: 'maintain' as const,
   activity_level: 'moderate' as const,
   diabetes_type: 'none' as const,
@@ -55,5 +56,22 @@ describe('questionnaireSchema — limites de conteúdo pro prompt de IA', () => 
   it('peso e altura fora de faixas plausíveis são rejeitados', () => {
     expect(questionnaireSchema.safeParse({ ...BASE_INPUT, weight: 10 }).success).toBe(false);
     expect(questionnaireSchema.safeParse({ ...BASE_INPUT, height: 500 }).success).toBe(false);
+  });
+});
+
+describe('questionnaireSchema — sexo biológico (entrada obrigatória do cálculo de energia)', () => {
+  it('rejeita quando biological_sex está ausente', () => {
+    const withoutSex: Record<string, unknown> = { ...BASE_INPUT };
+    delete withoutSex.biological_sex;
+    expect(questionnaireSchema.safeParse(withoutSex).success).toBe(false);
+  });
+
+  it('rejeita valores fora de male/female', () => {
+    expect(questionnaireSchema.safeParse({ ...BASE_INPUT, biological_sex: 'other' }).success).toBe(false);
+  });
+
+  it('aceita male e female', () => {
+    expect(questionnaireSchema.safeParse({ ...BASE_INPUT, biological_sex: 'male' }).success).toBe(true);
+    expect(questionnaireSchema.safeParse({ ...BASE_INPUT, biological_sex: 'female' }).success).toBe(true);
   });
 });

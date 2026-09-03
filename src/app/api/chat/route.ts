@@ -4,8 +4,10 @@ import { buildChatSystemPrompt } from '@/lib/openai/prompts';
 import { featureLimitReason, PLAN_LIMITS } from '@/lib/plans';
 import { getUserEntitlement } from '@/lib/entitlement';
 import { checkDailyAiBudget, checkUserMonthlyBudget, consumeUsageQuota, logAiUsage, monthKey } from '@/lib/aiUsage';
-import { findForbiddenFoods, isHighRiskCondition, mealPlanContentSchema } from '@/lib/mealPlanSafety';
+import { findForbiddenFoods, getNutritionSafetyMode, mealPlanContentSchema } from '@/lib/mealPlanSafety';
+import { validateMealPlanMath } from '@/lib/nutrition/mealPlanMath';
 import { requireCurrentConsent, consentReasonMessage } from '@/lib/consentCheck';
+import { isRegulatoryReviewApproved } from '@/lib/regulatory';
 import { checkDistributedRateLimit } from '@/lib/distributedRateLimit';
 import { rateLimit } from '@/lib/ratelimit';
 import { createClient } from '@/lib/supabase/server';
@@ -154,7 +156,12 @@ export async function POST(req: Request) {
       reply = parsed2.reply ?? reply;
 
       if (parsed2.meal_plan_update && mealPlan?.id) {
-        if (questionnaire && isHighRiskCondition(questionnaire)) {
+        if (!isRegulatoryReviewApproved()) {
+          // Mesma trava de src/app/api/meal-plan/route.ts: edição de
+          // plano pelo chat também é geração personalizada de plano
+          // alimentar, e precisa da mesma aprovação regulatória.
+          reply += '\n\n_Ajustes automáticos no plano estão temporariamente indisponíveis. Tente novamente mais tarde._';
+        } else if (getNutritionSafetyMode(questionnaire) === 'restricted') {
           // Não deixamos o chat reescrever automaticamente um plano de
           // usuário com condição de alto risco — mesma regra aplicada na
           // geração inicial (ver src/app/api/meal-plan/route.ts).
@@ -164,8 +171,19 @@ export async function POST(req: Request) {
 
           if (validated.success) {
             const forbidden = findForbiddenFoods(validated.data, questionnaire?.allergies ?? []);
+            const mathIssues = validateMealPlanMath(validated.data);
 
-            if (forbidden.length === 0) {
+            if (forbidden.length > 0) {
+              console.warn('[chat] meal_plan_update rejeitado por alergia:', forbidden);
+              reply += `\n\n_Não apliquei essa mudança porque o resultado incluiria ${forbidden.join(', ')}, que está na sua lista de alergias/restrições._`;
+            } else if (mathIssues.length > 0) {
+              // Mesma barreira de src/app/api/meal-plan/route.ts, sem o
+              // retry automático — aqui é uma edição pontual, não a
+              // geração inicial; melhor recusar e deixar o usuário pedir
+              // de novo do que salvar algo matematicamente inconsistente.
+              console.warn('[chat] meal_plan_update com inconsistência matemática:', mathIssues);
+              reply += '\n\n_Não consegui aplicar essa mudança porque os números resultantes ficaram inconsistentes. Tente pedir de novo, talvez de um jeito diferente._';
+            } else {
               const updatedContent: MealPlanContent = {
                 ...validated.data,
                 disclaimer: validated.data.disclaimer || mealPlanContent?.disclaimer || '',
@@ -186,9 +204,6 @@ export async function POST(req: Request) {
               } else {
                 mealPlanUpdated = true;
               }
-            } else {
-              console.warn('[chat] meal_plan_update rejeitado por alergia:', forbidden);
-              reply += `\n\n_Não apliquei essa mudança porque o resultado incluiria ${forbidden.join(', ')}, que está na sua lista de alergias/restrições._`;
             }
           } else {
             console.error('[chat] meal_plan_update fora do schema:', validated.error.flatten());

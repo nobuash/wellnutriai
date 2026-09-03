@@ -5,6 +5,7 @@ import { Card } from '@/components/ui/Card';
 import { PLANS, type PlanInterval } from '@/lib/mercadopago/client';
 import { createClient } from '@/lib/supabase/client';
 import type { Entitlement } from '@/lib/entitlement';
+import { getNutritionSafetyMode } from '@/lib/mealPlanSafety';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { AlertCircle, Check, Copy, CreditCard, QrCode, Sparkles, X } from 'lucide-react';
 import Image from 'next/image';
@@ -100,6 +101,27 @@ export default function PricingPage() {
       return (await res.json()) as Entitlement;
     },
   });
+
+  // Mesma decisão de src/lib/mealPlanSafety.ts usada na geração de
+  // plano/chat — aqui evita vender o PRO como se a geração automática
+  // de plano alimentar (o principal benefício anunciado) estivesse
+  // disponível para um perfil que o sistema já sabe que vai bloquear.
+  const { data: questionnaireSafety } = useQuery({
+    queryKey: ['questionnaire-safety'],
+    queryFn: async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return null;
+      const { data } = await supabase
+        .from('nutrition_questionnaires')
+        .select('diabetes_type, is_pregnant, is_breastfeeding, has_kidney_disease, has_liver_disease, has_eating_disorder_history, has_severe_allergy, uses_insulin, other_medical_condition')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      return data;
+    },
+  });
+  const safetyMode = getNutritionSafetyMode(questionnaireSafety ?? null);
 
   const cancelMutation = useMutation({
     mutationFn: async () => {
@@ -240,19 +262,27 @@ export default function PricingPage() {
           {currentPlan === 'pro' ? (
             <div className="space-y-3">
               <Button className="w-full" disabled>Plano atual</Button>
-              <Button className="w-full" variant="outline" onClick={() => setShowCardModal(true)}>
-                <CreditCard className="h-4 w-4 mr-2" /> Renovar via Cartão
-              </Button>
-              {MERCADOPAGO_ENABLED && (
-                <Button
-                  className="w-full" variant="outline"
-                  loading={pixMutation.isPending}
-                  onClick={() => pixMutation.mutate(selectedInterval)}
-                >
-                  <QrCode className="h-4 w-4 mr-2" /> Renovar via PIX
-                </Button>
+              {safetyMode === 'restricted' ? (
+                <RestrictedPaymentNotice />
+              ) : (
+                <>
+                  <Button className="w-full" variant="outline" onClick={() => setShowCardModal(true)}>
+                    <CreditCard className="h-4 w-4 mr-2" /> Renovar via Cartão
+                  </Button>
+                  {MERCADOPAGO_ENABLED && (
+                    <Button
+                      className="w-full" variant="outline"
+                      loading={pixMutation.isPending}
+                      onClick={() => pixMutation.mutate(selectedInterval)}
+                    >
+                      <QrCode className="h-4 w-4 mr-2" /> Renovar via PIX
+                    </Button>
+                  )}
+                </>
               )}
             </div>
+          ) : safetyMode === 'restricted' ? (
+            <RestrictedPaymentNotice />
           ) : (
             <div className="space-y-3">
               <Button className="w-full" onClick={() => setShowCardModal(true)}>
@@ -366,6 +396,23 @@ export default function PricingPage() {
           onClose={() => setShowCardModal(false)}
         />
       )}
+    </div>
+  );
+}
+
+function RestrictedPaymentNotice() {
+  return (
+    <div className="rounded-md border border-warning/30 bg-warning/5 p-4 space-y-2">
+      <p className="text-sm text-ink-secondary">
+        Seu questionário indica uma condição de saúde que exige acompanhamento profissional
+        individualizado — por isso a geração automática de plano alimentar personalizado (o
+        principal recurso do PRO) não fica disponível para o seu perfil. Chat e análise de
+        refeição continuam disponíveis normalmente.
+      </p>
+      <p className="text-xs text-ink-muted">
+        Recomendamos consultar um(a) nutricionista para um plano alimentar seguro e
+        individualizado para a sua condição.
+      </p>
     </div>
   );
 }

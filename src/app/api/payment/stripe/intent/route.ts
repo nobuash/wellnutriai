@@ -3,6 +3,8 @@ import { type PlanInterval } from '@/lib/mercadopago/client';
 import { getAppUrl } from '@/lib/appUrl';
 import { checkDistributedRateLimit } from '@/lib/distributedRateLimit';
 import { consentReasonMessage, requireCurrentConsent } from '@/lib/consentCheck';
+import { getNutritionSafetyMode } from '@/lib/mealPlanSafety';
+import type { NutritionQuestionnaire } from '@/types/database';
 import { findActiveStripeSubscription, findStripeCustomerId } from '@/lib/stripe/activateSubscription';
 import { createClient } from '@/lib/supabase/server';
 import { createServiceClient } from '@/lib/supabase/service';
@@ -32,6 +34,30 @@ export async function POST(req: Request) {
   const consent = await requireCurrentConsent(supabase, user.id);
   if (!consent.ok) {
     return NextResponse.json({ error: consentReasonMessage(consent.reason!) }, { status: 403 });
+  }
+
+  // Defesa em profundidade do bloqueio já feito na UI (ver
+  // src/app/(app)/pricing/page-client.tsx): não inicia checkout se o
+  // principal benefício anunciado do PRO (geração automática de plano
+  // alimentar) não pode ser entregue ao perfil deste usuário. Quem
+  // ainda não respondeu o questionário passa normalmente — a
+  // restrição só se aplica a quem o sistema já sabe que vai bloquear.
+  const { data: questionnaire } = (await supabase
+    .from('nutrition_questionnaires')
+    .select('diabetes_type, is_pregnant, is_breastfeeding, has_kidney_disease, has_liver_disease, has_eating_disorder_history, has_severe_allergy, uses_insulin, other_medical_condition')
+    .eq('user_id', user.id)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle()) as { data: NutritionQuestionnaire | null };
+
+  if (getNutritionSafetyMode(questionnaire) === 'restricted') {
+    return NextResponse.json(
+      {
+        error: 'A geração automática de plano alimentar não está disponível para o seu perfil — consulte um(a) nutricionista para um plano individualizado.',
+        restrictedProfile: true,
+      },
+      { status: 422 },
+    );
   }
 
   const { planInterval = 'monthly' } = await req.json().catch(() => ({})) as { planInterval?: PlanInterval };

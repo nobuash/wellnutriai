@@ -189,4 +189,30 @@ nextConfig.env = {
   NEXT_PUBLIC_MERCADOPAGO_ENABLED: String(mercadoPagoEnabled),
 };
 
+// Bloqueador de lançamento: nenhum documento legal (Termos,
+// Privacidade, Cancelamento, Retenção de Dados) pode ir ao ar com dado
+// institucional/jurídico ainda ausente (ver src/config/legal.ts, único
+// lugar que essas informações são preenchidas — nunca inventadas aqui
+// nem em nenhum outro lugar do código).
+//
+// Só falha o build de verdade no deploy de produção real da Vercel
+// (VERCEL_ENV === 'production'). Em dev, CI e previews de PR isso só
+// avisa: travar QUALQUER build (inclusive o preview de uma feature sem
+// nenhuma relação com o jurídico) enquanto esses dados não existem
+// bloquearia todo o trabalho da equipe por um motivo que não é dela —
+// o objetivo é impedir que o site real vá ao ar incompleto, não
+// impedir o time de continuar trabalhando.
+const { getMissingLegalEnvVars, shouldBlockProductionDeploy } = require('./src/lib/legalDocsGate');
+const missingLegalVars = getMissingLegalEnvVars(process.env);
+if (missingLegalVars.length > 0) {
+  const message =
+    `Documentos legais incompletos — variáveis ausentes: ${missingLegalVars.join(', ')}. ` +
+    'Preencha com informação real e revisada (nunca inventada) antes de publicar. ' +
+    'Ver docs/PRODUCTION_CHECKLIST.md.';
+  if (shouldBlockProductionDeploy(process.env)) {
+    throw new Error(`[next.config.js] ${message}`);
+  }
+  console.warn(`[next.config.js] ${message}`);
+}
+
 module.exports = withPWA(nextConfig);

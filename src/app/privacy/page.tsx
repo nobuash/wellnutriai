@@ -1,5 +1,13 @@
 import type { Metadata } from 'next';
 import { LegalPageLayout } from '@/components/LegalPageLayout';
+import {
+  DPO_CONTACT_EMAIL,
+  LEGAL_DOCS_UPDATED_AT,
+  LEGAL_ENTITY_ADDRESS,
+  LEGAL_ENTITY_CNPJ,
+  LEGAL_ENTITY_NAME,
+} from '@/config/legal';
+import { DATA_PROCESSORS } from '@/config/dataProcessors';
 
 export const metadata: Metadata = {
   title: 'Política de Privacidade — WellNutriAI',
@@ -14,9 +22,9 @@ export const metadata: Metadata = {
 // profissional de direito especializado em LGPD antes de publicar.
 export default function PrivacyPage() {
   return (
-    <LegalPageLayout title="Política de Privacidade" updatedAt="[PLACEHOLDER: data de publicação]">
+    <LegalPageLayout title="Política de Privacidade" updatedAt={LEGAL_DOCS_UPDATED_AT ?? '[PLACEHOLDER: data de publicação]'}>
       <p>
-        Esta Política descreve como <strong>[PLACEHOLDER: razão social]</strong>{' '}
+        Esta Política descreve como <strong>{LEGAL_ENTITY_NAME ?? '[PLACEHOLDER: razão social]'}</strong>{' '}
         (&quot;WellNutriAI&quot;, &quot;nós&quot;) trata dados pessoais de
         usuários da Plataforma, em conformidade com a Lei Geral de Proteção
         de Dados (Lei nº 13.709/2018 — LGPD).
@@ -24,8 +32,12 @@ export default function PrivacyPage() {
 
       <h2>1. Controlador de dados</h2>
       <p>
-        <strong>[PLACEHOLDER: razão social, CNPJ, endereço]</strong>. Encarregado
-        de dados (DPO): <strong>[PLACEHOLDER: nome/e-mail de contato do encarregado]</strong>.
+        <strong>
+          {LEGAL_ENTITY_NAME && LEGAL_ENTITY_CNPJ && LEGAL_ENTITY_ADDRESS
+            ? `${LEGAL_ENTITY_NAME}, CNPJ ${LEGAL_ENTITY_CNPJ}, com sede em ${LEGAL_ENTITY_ADDRESS}`
+            : '[PLACEHOLDER: razão social, CNPJ, endereço]'}
+        </strong>
+        . Encarregado de dados (DPO): <strong>{DPO_CONTACT_EMAIL ?? '[PLACEHOLDER: nome/e-mail de contato do encarregado]'}</strong>.
       </p>
 
       <h2>2. Dados que coletamos</h2>
@@ -73,29 +85,51 @@ export default function PrivacyPage() {
         pessoais a terceiros.
       </p>
 
-      <h2>5. Retenção de dados</h2>
+      <h2>5. Transferência internacional de dados</h2>
+      {DATA_PROCESSORS.length > 0 ? (
+        <ul className="list-disc pl-6 space-y-2">
+          {DATA_PROCESSORS.map((p) => (
+            <li key={p.operator}>
+              <strong>{p.operator}</strong> — {p.purpose}. Categorias de dados:{' '}
+              {p.dataCategories.join(', ')}. País(es) de destino: {p.destinationCountries.join(', ')}.
+              Duração: {p.duration}. Mecanismo de transferência: {p.transferMechanism}. Contato: {p.contact}.
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p>
+          <strong>
+            [PLACEHOLDER: alguns dos fornecedores listados na seção 4 processam dados fora do Brasil.
+            O detalhamento por operador (país de destino, mecanismo de transferência utilizado e
+            duração) está em preparação e será publicado aqui assim que confirmado com cada
+            fornecedor.]
+          </strong>
+        </p>
+      )}
+
+      <h2>6. Retenção de dados</h2>
       <p>
         Ver a <a href="/data-retention" className="text-primary-600 underline">Política de Retenção de Dados</a>{' '}
         para prazos específicos por tipo de dado.
       </p>
 
-      <h2>6. Seus direitos (LGPD)</h2>
+      <h2>7. Seus direitos (LGPD)</h2>
       <p>
         Você pode solicitar a qualquer momento: confirmação de tratamento,
         acesso, correção, anonimização, portabilidade ou exclusão dos seus
         dados. A exclusão de conta está disponível diretamente em{' '}
         <strong>Configurações da conta</strong> dentro da Plataforma.
-        Para as demais solicitações: <strong>[PLACEHOLDER: e-mail/canal de contato do DPO]</strong>.
+        Para as demais solicitações: <strong>{DPO_CONTACT_EMAIL ?? '[PLACEHOLDER: e-mail/canal de contato do DPO]'}</strong>.
       </p>
 
-      <h2>7. Segurança</h2>
+      <h2>8. Segurança</h2>
       <p>
         Adotamos controles técnicos como controle de acesso por linha
         (RLS) no banco de dados, criptografia em trânsito, e segregação de
         credenciais administrativas do restante da aplicação.
       </p>
 
-      <h2>8. Alterações desta política</h2>
+      <h2>9. Alterações desta política</h2>
       <p>
         Mudanças relevantes exigem novo aceite explícito antes de você
         continuar usando funcionalidades pagas ou que envolvam IA.
